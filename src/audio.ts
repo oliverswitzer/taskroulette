@@ -85,7 +85,6 @@ export function playTick(velocity: number): void {
   const dest = getDestination()
 
   // Layer 1: Sharp transient click (bandpass-filtered noise burst)
-  // Decay: 12ms — at 18ms min tick interval, tails never overlap
   const clickBufferSize = Math.floor(audioCtx.sampleRate * 0.006)
   const clickBuffer = audioCtx.createBuffer(1, clickBufferSize, audioCtx.sampleRate)
   const clickData = clickBuffer.getChannelData(0)
@@ -98,7 +97,7 @@ export function playTick(velocity: number): void {
   clickFilter.Q.value = 1.2
   const clickGain = audioCtx.createGain()
   clickGain.gain.setValueAtTime(0.9, t)
-  clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.012)  // was 0.04
+  clickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04)
   const clickSource = audioCtx.createBufferSource()
   clickSource.buffer = clickBuffer
   clickSource.connect(clickFilter)
@@ -107,16 +106,15 @@ export function playTick(velocity: number): void {
   clickSource.start(t)
 
   // Layer 2: Resonant body (triangle oscillator)
-  // Decay: 18ms — gone before the next tick fires
   const osc = audioCtx.createOscillator()
   osc.type = 'triangle'
   osc.frequency.setValueAtTime(280 + velocity * 1800, t)
-  osc.frequency.exponentialRampToValueAtTime(180, t + 0.018)
+  osc.frequency.exponentialRampToValueAtTime(180, t + 0.06)
   const bodyGain = audioCtx.createGain()
-  bodyGain.gain.setValueAtTime(0.28, t)                          // was 0.35
-  bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.018)  // was 0.08
+  bodyGain.gain.setValueAtTime(0.35, t)
+  bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
   osc.connect(bodyGain)
   bodyGain.connect(dest)
   osc.start(t)
-  osc.stop(t + 0.020)                                            // was 0.09
+  osc.stop(t + 0.09)
 }
