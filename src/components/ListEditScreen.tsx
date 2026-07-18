@@ -306,7 +306,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       >
         {task.text}
       </span>
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button
           type="button"
           onClick={onEdit}
@@ -322,7 +322,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            color: 'var(--color-ink-muted)',
+            color: 'oklch(68% 0.02 260)',
             transition: 'color 0.15s ease, background 0.15s ease',
           }}
           onMouseEnter={e => {
@@ -332,7 +332,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           }}
           onMouseLeave={e => {
             const el = e.currentTarget
-            el.style.color = 'var(--color-ink-muted)'
+            el.style.color = 'oklch(68% 0.02 260)'
             el.style.background = 'transparent'
           }}
         >
@@ -353,7 +353,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            color: 'var(--color-ink-muted)',
+            color: 'oklch(68% 0.02 260)',
             transition: 'color 0.15s ease, background 0.15s ease',
           }}
           onMouseEnter={e => {
@@ -363,7 +363,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           }}
           onMouseLeave={e => {
             const el = e.currentTarget
-            el.style.color = 'var(--color-ink-muted)'
+            el.style.color = 'oklch(68% 0.02 260)'
             el.style.background = 'transparent'
           }}
         >

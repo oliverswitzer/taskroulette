@@ -87,7 +87,7 @@ function SkeletonRow({ width, delay }: { width: string; delay: number }) {
         style={{
           width,
           height: 16,
-          background: 'var(--color-surface2)',
+          background: 'oklch(30% 0.03 260)',
           borderRadius: 'var(--rounded-full)',
           position: 'relative',
           overflow: 'hidden',
@@ -101,7 +101,7 @@ function SkeletonRow({ width, delay }: { width: string; delay: number }) {
             width: '60%',
             height: '100%',
             background:
-              'linear-gradient(90deg, transparent 0%, oklch(32% 0.025 260 / 0.6) 50%, transparent 100%)',
+              'linear-gradient(90deg, transparent 0%, oklch(55% 0.03 260 / 0.7) 50%, transparent 100%)',
           }}
           animate={{ x: ['-100%', '260%'] }}
           transition={{
