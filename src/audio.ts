@@ -61,11 +61,15 @@ export function resumeAudioContext(): void {
   }
 }
 
-// Call when the spin ends — suspends the context so the idle MediaStream
-// stops emitting and can't produce background clicking artifacts.
+// Call when the spin ends — suspends the context AND pauses the audio element
+// so iOS has no active audio session between spins.
 export function suspendAudioContext(): void {
   if (audioCtx && audioCtx.state === 'running') {
     audioCtx.suspend().catch(() => {})
+  }
+  if (audioEl && !audioEl.paused) {
+    audioEl.pause()
+    audioElReady = false
   }
 }
 

@@ -8,7 +8,8 @@ export default defineConfig({
   retries: 0,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'https://localhost:5173',
+    ignoreHTTPSErrors: true,
     trace: 'on-first-retry',
     screenshot: 'on-first-retry',
   },
@@ -36,9 +37,10 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev',
-      url: 'http://localhost:5173',
+      url: 'https://localhost:5173',
       reuseExistingServer: true,
-      timeout: 30000
+      timeout: 30000,
+      ignoreHTTPSErrors: true,
     },
     {
       command: 'npx tsx server.ts',
