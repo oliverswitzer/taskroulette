@@ -61,7 +61,7 @@ export default function ListEditScreen({
         minHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
-        padding: '32px 20px 120px',
+        padding: '48px 20px calc(80px + 32px)',
         boxSizing: 'border-box',
         maxWidth: 600,
         margin: '0 auto',
@@ -89,13 +89,17 @@ export default function ListEditScreen({
           >
             Your tasks
           </h1>
+          {/* P1-5: Energized badge */}
           <span
             data-warning={isWarning ? 'true' : 'false'}
             style={{
               background: isWarning
-                ? 'oklch(40% 0.1 30)'
-                : 'var(--color-surface2)',
-              color: isWarning ? 'var(--color-accent)' : 'var(--color-ink-muted)',
+                ? 'oklch(25% 0.08 30)'
+                : 'oklch(20% 0.05 30)',
+              color: isWarning ? 'var(--color-accent-glow)' : 'var(--color-accent)',
+              border: isWarning
+                ? '1px solid oklch(40% 0.12 30)'
+                : '1px solid oklch(35% 0.1 30)',
               borderRadius: 'var(--rounded-full)',
               padding: '4px 12px',
               fontSize: '0.75rem',
@@ -118,13 +122,14 @@ export default function ListEditScreen({
         </p>
       </div>
 
-      {/* Task list */}
+      {/* Task list — P0-2: paddingBottom so CTA doesn't obscure last item */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
           flex: 1,
+          paddingBottom: 'calc(80px + 32px)',
         }}
       >
         <AnimatePresence initial>
@@ -295,6 +300,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
         border: '1px solid var(--color-border)',
       }}
     >
+      {/* P1-2: Show ONLY task text, no numbering prefix */}
       <span
         style={{
           flex: 1,
@@ -306,7 +312,8 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       >
         {task.text}
       </span>
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {/* P1-4: Higher contrast icon buttons with 44x44 touch targets */}
+      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button
           type="button"
           onClick={onEdit}
@@ -322,17 +329,17 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            color: 'oklch(68% 0.02 260)',
+            color: 'oklch(65% 0.02 260)',
             transition: 'color 0.15s ease, background 0.15s ease',
           }}
           onMouseEnter={e => {
             const el = e.currentTarget
-            el.style.color = 'var(--color-ink)'
+            el.style.color = 'oklch(90% 0.01 260)'
             el.style.background = 'var(--color-surface2)'
           }}
           onMouseLeave={e => {
             const el = e.currentTarget
-            el.style.color = 'oklch(68% 0.02 260)'
+            el.style.color = 'oklch(65% 0.02 260)'
             el.style.background = 'transparent'
           }}
         >
@@ -353,7 +360,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            color: 'oklch(68% 0.02 260)',
+            color: 'oklch(65% 0.02 260)',
             transition: 'color 0.15s ease, background 0.15s ease',
           }}
           onMouseEnter={e => {
@@ -363,7 +370,7 @@ function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           }}
           onMouseLeave={e => {
             const el = e.currentTarget
-            el.style.color = 'oklch(68% 0.02 260)'
+            el.style.color = 'oklch(65% 0.02 260)'
             el.style.background = 'transparent'
           }}
         >

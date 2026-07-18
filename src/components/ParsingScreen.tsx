@@ -20,13 +20,13 @@ export default function ParsingScreen() {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
+        alignItems: 'center',
         padding: '32px 20px',
         boxSizing: 'border-box',
-        maxWidth: 560,
-        margin: '0 auto',
         width: '100%',
       }}
     >
+      <div style={{ width: '100%', maxWidth: 560 }}>
       {/* Heading */}
       <h1
         style={{
@@ -67,6 +67,7 @@ export default function ParsingScreen() {
             <SkeletonRow width={width} delay={i * 0.15} />
           </motion.div>
         ))}
+      </div>
       </div>
     </motion.div>
   )
