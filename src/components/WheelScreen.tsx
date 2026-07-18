@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
-import { initAudioContext, resumeAudioContext, playTick } from '../audio'
+import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
@@ -48,7 +48,6 @@ export default function WheelScreen({
 
   // Track last angle for audio notch crossings
   const lastAngleRef = useRef<number>(0)
-  const audioInitRef = useRef<boolean>(false)
 
   // Track final angle for when spin completes
   const finalAngleRef = useRef<number>(0)
@@ -82,14 +81,20 @@ export default function WheelScreen({
     }
 
     lastAngleRef.current = physics.angle
-  }, [physics.angle, physics.velocity, isSpinning, tasks.length, tickerDeflection])
+  // NOTE: tickerDeflection intentionally omitted — this effect only writes it,
+  // never reads it. Including it caused double-tick firing on every bounce.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [physics.angle, physics.velocity, isSpinning, tasks.length])
 
-  // Transition to TASK_CARD when spin completes (after 600ms glow hold)
+  // Transition to TASK_CARD when spin completes (after 600ms glow hold).
+  // Also suspends the AudioContext so the idle MediaStream stops emitting.
   const spinTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (physics.winningSliceIndex !== null && !isSpinning) {
       const winnerIndex = physics.winningSliceIndex
       const finalAngle = finalAngleRef.current
+
+      suspendAudioContext()
 
       spinTransitionRef.current = setTimeout(() => {
         if (tasks[winnerIndex]) {
@@ -106,12 +111,7 @@ export default function WheelScreen({
     (velocity: number) => {
       if (isSpinning || tasks.length === 0) return
 
-      // iOS requires AudioContext creation AND resume in the same synchronous
-      // tick as the user gesture. Do both here, before any async work.
-      if (!audioInitRef.current) {
-        initAudioContext()
-        audioInitRef.current = true
-      }
+      // resumeAudioContext() handles init + resume in the same gesture tick.
       resumeAudioContext()
 
       lastAngleRef.current = physics.angle

@@ -1,21 +1,17 @@
 // Mechanical peg-click tick — tuned for a real prize wheel ratchet feel
 // Combines a sharp transient (attack) with a short resonant body
 //
-// iOS routing note: Web Audio's audioCtx.destination routes to the RINGER channel,
-// which is silenced by the mute switch and ringer volume. To route through the
-// MEDIA channel (volume-button controlled, not affected by mute switch), we pipe
-// through MediaStreamAudioDestinationNode → <audio> element. This is the only
-// reliable way to get Web Audio output on iOS Safari + Chrome iOS.
+// iOS routing: Web Audio's audioCtx.destination routes to the RINGER channel
+// (silenced by mute switch). We pipe through MediaStreamAudioDestinationNode →
+// <audio> element to use the MEDIA channel instead (volume buttons, not mute).
 
 let audioCtx: AudioContext | null = null
 let mediaStreamDest: MediaStreamAudioDestinationNode | null = null
 let audioEl: HTMLAudioElement | null = null
-let audioElReady = false   // true once audioEl.play() has resolved
+let audioElReady = false
 let lastTickTime = 0
 const MIN_TICK_INTERVAL_MS = 18
 
-// The node to connect synthesis outputs to — either the MediaStream destination
-// (iOS media-channel routing) or the default destination (desktop).
 function getDestination(): AudioNode {
   if (mediaStreamDest) return mediaStreamDest
   return audioCtx!.destination
@@ -33,36 +29,31 @@ function _init(): void {
       .then(() => { audioElReady = true })
       .catch(() => {})
   } catch {
-    // MediaStreamAudioDestinationNode not supported — fall back, mark ready immediately
+    // MediaStreamAudioDestinationNode not supported — fall back to default destination
     mediaStreamDest = null
     audioEl = null
     audioElReady = true
   }
+
+  // Start suspended — only resume when actually spinning. Keeps the MediaStream
+  // idle between spins so it doesn't emit buffer-click artifacts at rest.
+  audioCtx.suspend().catch(() => {})
 }
 
-// Bootstrap audio on the very first touch anywhere on the page.
-// This fires long before the user reaches the spin button, so by the time
-// they tap Spin the <audio> element has already resolved play() and is ready.
+// Bootstrap on the first touch/click — fires well before the spin button,
+// so audioEl.play() has resolved long before the user can tap Spin.
 if (typeof document !== 'undefined') {
   document.addEventListener('touchstart', () => { _init() }, { once: true, passive: true })
-  // Also on first click (desktop)
   document.addEventListener('click', () => { _init() }, { once: true })
 }
 
-export function initAudioContext(): void {
-  _init()
-}
-
-// Call this synchronously inside a button click handler (user gesture).
-// iOS requires AudioContext.resume() AND audioEl.play() in the same gesture tick.
+// Call synchronously inside the spin button click handler (user gesture).
+// Resumes the suspended context + re-kicks audioEl.play() if needed.
 export function resumeAudioContext(): void {
   _init()
   if (audioCtx && audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {})
   }
-  // Kick play() again in this gesture tick — iOS may have paused the element
-  // after silence. play() is a no-op if already playing, but re-calls in a
-  // gesture context if it had been paused/interrupted.
   if (audioEl) {
     audioEl.play()
       .then(() => { audioElReady = true })
@@ -70,10 +61,16 @@ export function resumeAudioContext(): void {
   }
 }
 
+// Call when the spin ends — suspends the context so the idle MediaStream
+// stops emitting and can't produce background clicking artifacts.
+export function suspendAudioContext(): void {
+  if (audioCtx && audioCtx.state === 'running') {
+    audioCtx.suspend().catch(() => {})
+  }
+}
+
 export function playTick(velocity: number): void {
-  if (!audioCtx) return
-  if (!audioElReady) return  // <audio> element not playing yet — skip rather than queue
-  // Don't try to resume here — we're in a RAF callback, not a gesture.
+  if (!audioCtx || !audioElReady) return
   if (audioCtx.state !== 'running') return
 
   const now = audioCtx.currentTime * 1000
@@ -83,13 +80,12 @@ export function playTick(velocity: number): void {
   const t = audioCtx.currentTime
   const dest = getDestination()
 
-  // Layer 1: Sharp transient click
+  // Layer 1: Sharp transient click (bandpass-filtered noise burst)
   const clickBufferSize = Math.floor(audioCtx.sampleRate * 0.006)
   const clickBuffer = audioCtx.createBuffer(1, clickBufferSize, audioCtx.sampleRate)
   const clickData = clickBuffer.getChannelData(0)
   for (let i = 0; i < clickBufferSize; i++) {
-    const env = Math.exp(-i / (clickBufferSize * 0.15))
-    clickData[i] = (Math.random() * 2 - 1) * env
+    clickData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (clickBufferSize * 0.15))
   }
   const clickFilter = audioCtx.createBiquadFilter()
   clickFilter.type = 'bandpass'
@@ -105,7 +101,7 @@ export function playTick(velocity: number): void {
   clickGain.connect(dest)
   clickSource.start(t)
 
-  // Layer 2: Resonant body
+  // Layer 2: Resonant body (triangle oscillator)
   const osc = audioCtx.createOscillator()
   osc.type = 'triangle'
   osc.frequency.setValueAtTime(280 + velocity * 1800, t)
