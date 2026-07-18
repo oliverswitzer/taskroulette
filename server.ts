@@ -24,18 +24,19 @@ export function createApp() {
   currentApp.use('/*', cors({ origin: '*' }))
 
   currentApp.post('/api/parse', async (c) => {
-    const body = await c.req.json<{ dump: string }>()
-    
-    if (!body.dump?.trim()) {
-      return c.json({ error: 'No dump provided' }, 400)
-    }
+    try {
+      const body = await c.req.json<{ dump: string }>()
+      
+      if (!body.dump?.trim()) {
+        return c.json({ error: 'No dump provided' }, 400)
+      }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: `You are a supportive assistant for someone with ADHD.
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: `You are a supportive assistant for someone with ADHD.
 Extract a concrete, actionable task list from this brain dump.
 Return ONLY a valid JSON array of strings -- no explanation, no markdown, no code blocks.
 Rules:
@@ -45,14 +46,21 @@ Rules:
 - No duplicates
 
 Brain dump: "${body.dump}"`
-      }]
-    })
+        }]
+      })
 
-    const content = message.content[0]
-    if (content.type !== 'text') return c.json({ error: 'Unexpected response' }, 500)
+      const content = message.content[0]
+      if (content.type !== 'text') return c.json({ error: 'Unexpected response' }, 500)
 
-    const tasks = JSON.parse(content.text) as string[]
-    return c.json({ tasks: tasks.slice(0, 15) })
+      // Strip markdown code fences if present (some models add ```json ... ```)
+      const rawText = content.text.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim()
+      const tasks = JSON.parse(rawText) as string[]
+      return c.json({ tasks: tasks.slice(0, 15) })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('Parse error:', message)
+      return c.json({ error: message }, 500)
+    }
   })
 
   currentApp.get('/api/health', (c) => c.json({ ok: true }))

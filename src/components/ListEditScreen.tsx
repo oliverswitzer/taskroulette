@@ -136,6 +136,7 @@ export default function ListEditScreen({
           {tasks.map((taskItem, i) => (
             <motion.div
               key={taskItem.id}
+              data-testid="task-item"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -16, scale: 0.97 }}

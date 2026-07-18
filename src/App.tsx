@@ -3,6 +3,7 @@ import type { AppState, Task } from './types'
 import DumpScreen from './components/DumpScreen'
 import ParsingScreen from './components/ParsingScreen'
 import ListEditScreen from './components/ListEditScreen'
+import { parseTasks } from './api'
 
 // Expose state setter for Playwright testing
 declare global {
@@ -12,25 +13,34 @@ declare global {
   }
 }
 
-const SAMPLE_TASKS: Task[] = [
-  { id: '1', text: 'Call dentist and schedule overdue cleaning', position: 0, completed: false },
-  { id: '2', text: 'Finish quarterly report for Monday meeting', position: 1, completed: false },
-  { id: '3', text: 'Email Sarah about project handoff', position: 2, completed: false },
-]
-
 function App() {
   const [appState, setAppState] = useState<AppState>('DUMP')
-  const [tasks, setTasks] = useState<Task[]>(SAMPLE_TASKS)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [parseError, setParseError] = useState<string | undefined>()
 
   useEffect(() => {
     window.__setAppState = setAppState
     window.__setTasks = setTasks
   }, [])
 
-  const handleDumpSubmit = (dump: string) => {
-    console.log('Dump submitted:', dump)
+  const handleDumpSubmit = async (dump: string) => {
+    setParseError(undefined)
     setAppState('PARSING')
-    setTimeout(() => setAppState('LIST_EDIT'), 2000)
+    try {
+      const parsed = await parseTasks(dump)
+      const newTasks: Task[] = parsed.map((text, i) => ({
+        id: String(Date.now() + i),
+        text,
+        position: i,
+        completed: false,
+      }))
+      setTasks(newTasks)
+      setAppState('LIST_EDIT')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      setParseError(msg)
+      setAppState('DUMP')
+    }
   }
 
   const handleAddTask = (text: string) => {
@@ -67,7 +77,7 @@ function App() {
       }}
     >
       {appState === 'DUMP' && (
-        <DumpScreen onSubmit={handleDumpSubmit} />
+        <DumpScreen onSubmit={handleDumpSubmit} error={parseError} />
       )}
       {appState === 'PARSING' && (
         <ParsingScreen />
