@@ -58,6 +58,7 @@ Playwright's `reuseExistingServer: true` means it won't double-start if they're 
 | `src/components/DumpScreen.tsx` | Textarea + photo attach (react-dropzone + shadcn Dialog) |
 | `src/components/WheelScreen.tsx` | Wheel UI. `autoSpinSignal` prop triggers auto-spin safely. |
 | `src/components/WheelCanvas.tsx` | 2D canvas wheel — uses hex colors, NOT oklch |
+| `src/audio.ts` | Real WAV click samples (base64 embedded) + iOS MediaStream routing. See ADR-002. |
 | `src/hooks/useWheelPhysics.ts` | Ref-based RAF physics. Never use setState in the loop. |
 | `tests/e2e/real-api.spec.ts` | E2E hitting real Anthropic API — text parse, vision, combined, full flow |
 | `tests/e2e/fixtures/task-list.png` | Fixture image used by vision E2E tests |
