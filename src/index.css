@@ -55,6 +55,23 @@ input, textarea {
   font-family: inherit;
 }
 
+/* Task card glow animation */
+@keyframes taskGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px oklch(72% 0.2 30 / 0.5),
+      0 0 32px oklch(72% 0.2 30 / 0.3),
+      0 4px 32px rgba(0,0,0,0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px oklch(72% 0.2 30 / 0.85),
+      0 0 56px oklch(72% 0.2 30 / 0.55),
+      0 0 80px oklch(72% 0.2 30 / 0.25),
+      0 4px 24px rgba(0,0,0,0.4);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -140,7 +140,7 @@ export default function DumpScreen({ onSubmit, error }: DumpScreenProps) {
             aria-label="Parse my tasks"
             style={{
               background: isEmpty ? 'oklch(22% 0.025 260)' : 'var(--color-accent)',
-              color: isEmpty ? 'oklch(40% 0.02 260)' : 'oklch(10% 0.01 30)',
+              color: isEmpty ? 'oklch(55% 0.02 260)' : 'oklch(10% 0.01 30)',
               border: isEmpty ? '1.5px solid oklch(30% 0.025 260)' : '1.5px solid transparent',
               borderRadius: 'var(--rounded-lg)',
               padding: '0 32px',
