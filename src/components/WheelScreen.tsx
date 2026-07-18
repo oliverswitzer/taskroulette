@@ -11,8 +11,9 @@ interface WheelScreenProps {
   onSpinStart?: () => void
   onTaskSelected: (task: Task, index: number, finalAngle: number) => void
   onEditTasks: () => void
+  onBackToDump: () => void
   autoSpinRef?: React.MutableRefObject<boolean>
-  autoSpinSignal?: number  // increment to trigger auto-spin (avoids StrictMode issues)
+  autoSpinSignal?: number
 }
 
 
@@ -21,6 +22,7 @@ export default function WheelScreen({
   onSpinStart,
   onTaskSelected,
   onEditTasks,
+  onBackToDump,
   autoSpinRef,
   autoSpinSignal = 0,
 }: WheelScreenProps) {
@@ -166,6 +168,34 @@ export default function WheelScreen({
           padding: '20px 0 16px',
         }}
       >
+        {/* Back to dump — hidden while spinning */}
+        <button
+          type="button"
+          onClick={onBackToDump}
+          aria-label="Back to task dump"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-ink-muted)',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 4px',
+            minHeight: 44,
+            opacity: isSpinning ? 0 : 1,
+            pointerEvents: isSpinning ? 'none' : 'auto',
+            transition: 'opacity 0.2s ease',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Dump
+        </button>
+
         {/* Task count badge */}
         <span
           style={{

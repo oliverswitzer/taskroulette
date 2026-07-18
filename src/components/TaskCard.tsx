@@ -7,7 +7,8 @@ import WheelCanvas from './WheelCanvas'
 interface TaskCardProps {
   task: Task
   onComplete: () => void
-  onSpinAgain: () => void
+  onSkip: () => void
+  onBackToDump: () => void
   wheelAngle: number
   winningIndex: number | null
   activeTasks: Task[]
@@ -28,7 +29,8 @@ function fireConfetti() {
 export default function TaskCard({
   task,
   onComplete,
-  onSpinAgain,
+  onSkip,
+  onBackToDump,
   wheelAngle,
   winningIndex,
   activeTasks,
@@ -61,8 +63,35 @@ export default function TaskCard({
         boxSizing: 'border-box',
       }}
     >
+      {/* Back button — top left */}
+      <div style={{ width: '100%', maxWidth: computedWheelSize, padding: '20px 0 0' }}>
+        <button
+          type="button"
+          onClick={onBackToDump}
+          aria-label="Back to task dump"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-ink-muted)',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 0',
+            minHeight: 44,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Dump
+        </button>
+      </div>
+
       {/* Frozen wheel with glowing winner */}
-      <div style={{ padding: '20px 0 0', width: computedWheelSize }}>
+      <div style={{ width: computedWheelSize }}>
         <div
           style={{
             borderRadius: '50%',
@@ -201,7 +230,7 @@ export default function TaskCard({
       <button
         type="button"
         data-testid="spin-again-btn"
-        onClick={onSpinAgain}
+        onClick={onSkip}
         style={{
           marginTop: 16,
           background: 'transparent',

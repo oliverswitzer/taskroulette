@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useDropzone } from 'react-dropzone'
 import {
@@ -23,26 +23,17 @@ export default function DumpScreen({ onSubmit, error, photoFile, onPhotoChange }
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  // Revoke object URLs on unmount / photo change
-  const previewUrlRef = useRef<string | null>(null)
+  // Revoke object URLs on unmount / photo change using useState so re-renders fire
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   useEffect(() => {
     if (photoFile) {
-      previewUrlRef.current = URL.createObjectURL(photoFile)
+      const url = URL.createObjectURL(photoFile)
+      setPreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
     } else {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current)
-        previewUrlRef.current = null
-      }
-    }
-    return () => {
-      if (previewUrlRef.current) {
-        URL.revokeObjectURL(previewUrlRef.current)
-        previewUrlRef.current = null
-      }
+      setPreviewUrl(null)
     }
   }, [photoFile])
-
-  const previewUrl = photoFile ? previewUrlRef.current : null
 
   const { getInputProps, open } = useDropzone({
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic'] },
@@ -284,9 +275,9 @@ export default function DumpScreen({ onSubmit, error, photoFile, onPhotoChange }
             <div
               style={{
                 position: 'absolute',
-                bottom: 10,
-                left: 10,
-                right: 10,
+                bottom: 12,
+                left: 14,
+                right: 14,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,

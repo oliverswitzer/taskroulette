@@ -194,7 +194,21 @@ function App() {
     }
   }
 
-  // ── TASK_CARD → WHEEL_IDLE (skip/spin again) ────────────────────────────────
+  // ── Back to dump (from anywhere mid-session) ────────────────────────────────
+  const handleBackToDump = () => {
+    setSelectedTask(null)
+    setSelectedIndex(null)
+    setAppState('DUMP')
+  }
+
+  // ── TASK_CARD → WHEEL_IDLE (skip — do NOT auto-spin) ────────────────────────
+  const handleSkip = () => {
+    setSelectedTask(null)
+    setSelectedIndex(null)
+    setAppState('WHEEL_IDLE')
+  }
+
+  // ── TASK_CARD → WHEEL_IDLE (spin again after completing — auto-spins) ────────
   const handleSpinAgain = () => {
     setSelectedTask(null)
     setSelectedIndex(null)
@@ -297,6 +311,7 @@ function App() {
               onSpinStart={handleSpinStart}
               onTaskSelected={handleTaskSelected}
               onEditTasks={handleOpenEdit}
+              onBackToDump={handleBackToDump}
               autoSpinSignal={autoSpinSignal}
             />
             <EditModal
@@ -324,7 +339,8 @@ function App() {
               <TaskCard
                 task={selectedTask}
                 onComplete={handleTaskComplete}
-                onSpinAgain={handleSpinAgain}
+                onSkip={handleSkip}
+                onBackToDump={handleBackToDump}
                 wheelAngle={wheelAngle}
                 winningIndex={selectedIndex}
                 activeTasks={activeTasks}
