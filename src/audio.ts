@@ -10,6 +10,7 @@
 let audioCtx: AudioContext | null = null
 let mediaStreamDest: MediaStreamAudioDestinationNode | null = null
 let audioEl: HTMLAudioElement | null = null
+let audioElReady = false   // true once audioEl.play() has resolved
 let lastTickTime = 0
 const MIN_TICK_INTERVAL_MS = 18
 
@@ -20,41 +21,58 @@ function getDestination(): AudioNode {
   return audioCtx!.destination
 }
 
-export function initAudioContext(): void {
+function _init(): void {
   if (audioCtx) return
   audioCtx = new AudioContext()
 
-  // Route through MediaStream → <audio> element to use the media channel on iOS.
-  // This must happen in the same gesture tick as AudioContext creation.
   try {
     mediaStreamDest = audioCtx.createMediaStreamDestination()
     audioEl = new Audio()
     audioEl.srcObject = mediaStreamDest.stream
-    // muted=false, autoplay via play() — must be called in gesture context
-    audioEl.play().catch(() => {})
+    audioEl.play()
+      .then(() => { audioElReady = true })
+      .catch(() => {})
   } catch {
-    // MediaStreamAudioDestinationNode not supported — fall back to default destination
+    // MediaStreamAudioDestinationNode not supported — fall back, mark ready immediately
     mediaStreamDest = null
     audioEl = null
+    audioElReady = true
   }
 }
 
+// Bootstrap audio on the very first touch anywhere on the page.
+// This fires long before the user reaches the spin button, so by the time
+// they tap Spin the <audio> element has already resolved play() and is ready.
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', () => { _init() }, { once: true, passive: true })
+  // Also on first click (desktop)
+  document.addEventListener('click', () => { _init() }, { once: true })
+}
+
+export function initAudioContext(): void {
+  _init()
+}
+
 // Call this synchronously inside a button click handler (user gesture).
-// iOS requires AudioContext.resume() AND audioEl.play() in the same tick as the tap.
+// iOS requires AudioContext.resume() AND audioEl.play() in the same gesture tick.
 export function resumeAudioContext(): void {
-  if (!audioCtx) initAudioContext()
+  _init()
   if (audioCtx && audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {})
   }
-  // Re-call play() each gesture — iOS pauses the <audio> element if it emits
-  // silence for too long, and it needs to be kicked in the gesture context.
-  if (audioEl && audioEl.paused) {
-    audioEl.play().catch(() => {})
+  // Kick play() again in this gesture tick — iOS may have paused the element
+  // after silence. play() is a no-op if already playing, but re-calls in a
+  // gesture context if it had been paused/interrupted.
+  if (audioEl) {
+    audioEl.play()
+      .then(() => { audioElReady = true })
+      .catch(() => {})
   }
 }
 
 export function playTick(velocity: number): void {
   if (!audioCtx) return
+  if (!audioElReady) return  // <audio> element not playing yet — skip rather than queue
   // Don't try to resume here — we're in a RAF callback, not a gesture.
   if (audioCtx.state !== 'running') return
 
