@@ -29,6 +29,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    allowedHosts: ['clawlivers-mac-mini.tail60e2f.ts.net'],
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
