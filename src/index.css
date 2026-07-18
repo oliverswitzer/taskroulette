@@ -1,0 +1,64 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-base: oklch(12% 0.02 260);
+  --color-surface: oklch(18% 0.025 260);
+  --color-surface2: oklch(22% 0.025 260);
+  --color-ink: oklch(95% 0.01 260);
+  --color-ink-muted: oklch(60% 0.02 260);
+  --color-border: oklch(28% 0.025 260);
+  --color-accent: oklch(72% 0.2 30);
+  --color-accent-glow: oklch(72% 0.25 30);
+  --color-success: oklch(75% 0.18 145);
+  
+  --rounded-sm: 8px;
+  --rounded-md: 14px;
+  --rounded-lg: 20px;
+  --rounded-xl: 28px;
+  --rounded-full: 9999px;
+  
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 20px;
+  --spacing-lg: 32px;
+  --spacing-xl: 48px;
+  
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  min-height: 100dvh;
+  background: var(--color-base);
+  color: var(--color-ink);
+  overflow-x: hidden;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input, textarea {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
