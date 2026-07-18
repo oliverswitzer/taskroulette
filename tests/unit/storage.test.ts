@@ -71,6 +71,32 @@ describe('saveAppState / loadAppState', () => {
   it('loadAppState returns null if key is missing', () => {
     expect(loadAppState()).toBeNull()
   })
+
+  it('loadAppState returns null for an unknown/garbage state', () => {
+    mockLocalStorage.setItem('tr-app-state', 'BANANA')
+    expect(loadAppState()).toBeNull()
+  })
+
+  describe('transient state sanitization on cold boot', () => {
+    it.each([
+      ['WHEEL_SPINNING', 'WHEEL_IDLE'],
+      ['TASK_CARD',      'WHEEL_IDLE'],
+      ['PARSING',        'DUMP'],
+    ])('restores %s → %s so the app never boots into a blank screen', (saved, expected) => {
+      mockLocalStorage.setItem('tr-app-state', saved)
+      expect(loadAppState()).toBe(expected)
+    })
+
+    it.each([
+      ['DUMP'],
+      ['LIST_EDIT'],
+      ['WHEEL_IDLE'],
+      ['ALL_DONE'],
+    ])('passes safe state %s through unchanged', (state) => {
+      mockLocalStorage.setItem('tr-app-state', state)
+      expect(loadAppState()).toBe(state)
+    })
+  })
 })
 
 describe('clearAll', () => {
