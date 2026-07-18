@@ -181,36 +181,90 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size, tickerDe
       }
     }
 
-    // ── Text labels ─────────────────────────────────────────────────────────
+    // ── Text labels (radial — runs from hub outward, parallel to dividers) ──
+    const hubR      = Math.max(16, size * 0.078)
+    const textInset = hubR + 6           // start just outside hub
+    const textOutset = radius - 6        // end just inside rim
+    const availLen  = textOutset - textInset
+
+    // Fixed font — keeping it consistent so pixel-measurement is reliable
+    const fontSize  = Math.max(9, Math.min(13, size * 0.032))
+    ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`
+    const lineHeight = fontSize * 1.25
+
+    // Truncate at word boundaries when possible, then characters
+    const truncate = (text: string, maxW: number): string => {
+      if (ctx.measureText(text).width <= maxW) return text
+      // Try dropping whole words from the end first
+      const words = text.split(' ')
+      for (let w = words.length - 1; w >= 1; w--) {
+        const candidate = words.slice(0, w).join(' ') + '…'
+        if (ctx.measureText(candidate).width <= maxW) return candidate
+      }
+      // Fall back to character-level trim
+      let t = text
+      while (t.length > 1 && ctx.measureText(t.slice(0, -1) + '…').width > maxW) {
+        t = t.slice(0, -1)
+      }
+      return t.slice(0, -1) + '…'
+    }
+
     for (let i = 0; i < count; i++) {
-      if (sliceAngle < 0.28) continue
+      if (sliceAngle < 0.2) continue   // skip slivers
 
-      const sliceMid = baseStartAngle + i * sliceAngle + sliceAngle / 2
-      const textRadius = radius * 0.62
-      const tx = cx + Math.cos(sliceMid) * textRadius
-      const ty = cy + Math.sin(sliceMid) * textRadius
+      const sliceMid  = baseStartAngle + i * sliceAngle + sliceAngle / 2
+      const color     = WHEEL_COLORS_HEX[i % WHEEL_COLORS_HEX.length]
+      const isWinner  = winningIndex === i
+      const normAngle = ((sliceMid % TAU) + TAU) % TAU
+      const isLeftHalf = normAngle > Math.PI / 2 && normAngle < 3 * Math.PI / 2
 
-      const rawText = tasks[i].text
-      const label = rawText.length > 12 ? rawText.slice(0, 11) + '…' : rawText
-      const color = WHEEL_COLORS_HEX[i % WHEEL_COLORS_HEX.length]
-      const isWinner = winningIndex === i
-
-      ctx.save()
-      ctx.translate(tx, ty)
-      const normSC = ((sliceMid % TAU) + TAU) % TAU
-      const isBottomHalf = normSC >= Math.PI / 2 && normSC <= (3 * Math.PI) / 2
-      ctx.rotate(isBottomHalf ? sliceMid - Math.PI / 2 : sliceMid + Math.PI / 2)
-
-      const fontSize = Math.max(10, Math.min(14, size * 0.034))
-      ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`
       const lightSegments = new Set(['#E09B00', '#82C900', '#1EAA4A'])
       const isDarkText = lightSegments.has(color)
-      ctx.fillStyle = isDarkText ? 'rgba(10,10,10,0.92)' : 'rgba(255,255,255,0.97)'
-      ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.8)'
-      ctx.shadowBlur = isWinner ? 8 : 4
-      ctx.textAlign = 'center'
+
+      const raw = tasks[i].text
+      let line1 = raw, line2 = ''
+
+      // For wide slices (≥ 90°) try 2-line wrapping — only if full text doesn't fit
+      if (sliceAngle >= Math.PI / 2 && ctx.measureText(raw).width > availLen) {
+        const words = raw.split(' ')
+        // Find the best word split where BOTH lines fit in availLen
+        let bestSplit = -1
+        for (let w = 1; w < words.length; w++) {
+          const l1 = words.slice(0, w).join(' ')
+          const l2 = words.slice(w).join(' ')
+          if (ctx.measureText(l1).width <= availLen && ctx.measureText(l2).width <= availLen) {
+            bestSplit = w  // keep updating — last valid split gives more on line 1
+          }
+        }
+        if (bestSplit > 0) {
+          line1 = words.slice(0, bestSplit).join(' ')
+          line2 = words.slice(bestSplit).join(' ')
+        } else {
+          // Can't split cleanly — wrap at midpoint and truncate each line
+          const mid = Math.ceil(words.length / 2)
+          line1 = truncate(words.slice(0, mid).join(' '), availLen)
+          line2 = truncate(words.slice(mid).join(' '),    availLen)
+        }
+      } else {
+        line1 = truncate(raw, availLen)
+      }
+
+      ctx.save()
+      ctx.translate(cx, cy)
+      ctx.rotate(isLeftHalf ? sliceMid + Math.PI : sliceMid)
       ctx.textBaseline = 'middle'
-      ctx.fillText(label, 0, 0)
+      ctx.fillStyle   = isDarkText ? 'rgba(10,10,10,0.92)' : 'rgba(255,255,255,0.97)'
+      ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.8)'
+      ctx.shadowBlur  = isWinner ? 8 : 4
+      ctx.textAlign   = isLeftHalf ? 'right' : 'left'
+      const xAnchor   = isLeftHalf ? -textInset : textInset
+
+      if (line2) {
+        ctx.fillText(line1, xAnchor, -lineHeight / 2)
+        ctx.fillText(line2, xAnchor,  lineHeight / 2)
+      } else {
+        ctx.fillText(line1, xAnchor, 0)
+      }
       ctx.restore()
     }
 
