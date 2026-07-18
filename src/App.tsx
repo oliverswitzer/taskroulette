@@ -151,13 +151,21 @@ function App() {
     setCompletedCount(newCount)
     saveCompletedCount(newCount)
 
-    setSelectedTask(null)
-    setSelectedIndex(null)
-
     const remaining = updated.filter(t => !t.completed)
     if (remaining.length === 0) {
+      setSelectedTask(null)
+      setSelectedIndex(null)
       setAppState('ALL_DONE')
+    } else if (remaining.length === 1) {
+      // Go directly to TASK_CARD for the last task — skipping WHEEL_IDLE avoids
+      // the AnimatePresence double-transition race that causes a black screen.
+      setSelectedTask(remaining[0])
+      setSelectedIndex(0)
+      setWheelAngle(0)
+      setAppState('TASK_CARD')
     } else {
+      setSelectedTask(null)
+      setSelectedIndex(null)
       setAppState('WHEEL_IDLE')
     }
   }
@@ -280,7 +288,7 @@ function App() {
 
         {appState === 'TASK_CARD' && (
           <motion.div
-            key="task-card"
+            key={`task-card-${selectedTask?.id ?? 'none'}`}
             variants={pageVariants}
             initial="initial"
             animate="animate"
