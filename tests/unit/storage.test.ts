@@ -80,11 +80,15 @@ describe('saveAppState / loadAppState', () => {
   describe('transient state sanitization on cold boot', () => {
     it.each([
       ['WHEEL_SPINNING', 'WHEEL_IDLE'],
-      ['TASK_CARD',      'WHEEL_IDLE'],
       ['PARSING',        'DUMP'],
     ])('restores %s → %s so the app never boots into a blank screen', (saved, expected) => {
       mockLocalStorage.setItem('tr-app-state', saved)
       expect(loadAppState()).toBe(expected)
+    })
+
+    it('restores TASK_CARD → TASK_CARD (caller must verify selectedTaskId exists)', () => {
+      mockLocalStorage.setItem('tr-app-state', 'TASK_CARD')
+      expect(loadAppState()).toBe('TASK_CARD')
     })
 
     it.each([

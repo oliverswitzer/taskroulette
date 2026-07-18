@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
-import { initAudioContext, playTick } from '../audio'
+import { initAudioContext, resumeAudioContext, playTick } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
@@ -106,10 +106,13 @@ export default function WheelScreen({
     (velocity: number) => {
       if (isSpinning || tasks.length === 0) return
 
+      // iOS requires AudioContext creation AND resume in the same synchronous
+      // tick as the user gesture. Do both here, before any async work.
       if (!audioInitRef.current) {
         initAudioContext()
         audioInitRef.current = true
       }
+      resumeAudioContext()
 
       lastAngleRef.current = physics.angle
       onSpinStart?.()

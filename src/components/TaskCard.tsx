@@ -39,7 +39,13 @@ export default function TaskCard({
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
 
-  const computedWheelSize = wheelSize ?? Math.min(window.innerWidth - 40, 400)
+  // Wheel is smaller on task card to leave room for the card below
+  const computedWheelSize = wheelSize ?? Math.min(window.innerWidth - 40, 280)
+
+  // Clamp long task text so it never blows out the card height
+  const displayText = task.text.length > 60
+    ? task.text.slice(0, 57) + '…'
+    : task.text
 
   const handleCheck = useCallback(() => {
     if (checked || completing) return
@@ -55,16 +61,17 @@ export default function TaskCard({
     <div
       data-testid="task-card"
       style={{
-        minHeight: '100dvh',
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '0 20px 40px',
+        padding: '0 20px 16px',
         boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       {/* Back button — top left */}
-      <div style={{ width: '100%', maxWidth: computedWheelSize, padding: '20px 0 0' }}>
+      <div style={{ width: '100%', maxWidth: computedWheelSize, padding: '12px 0 0' }}>
         <button
           type="button"
           onClick={onBackToDump}
@@ -110,16 +117,16 @@ export default function TaskCard({
 
       {/* Floating task card */}
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.9 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         style={{
-          marginTop: 20,
+          marginTop: 12,
           width: '100%',
           maxWidth: 400,
           background: 'var(--color-surface)',
           borderRadius: 'var(--rounded-xl)',
-          padding: 28,
+          padding: '16px 20px',
           animation: 'taskGlow 1.8s ease-in-out infinite',
           position: 'relative',
         }}
@@ -127,11 +134,11 @@ export default function TaskCard({
         {/* Label above */}
         <p
           style={{
-            fontSize: '0.75rem',
+            fontSize: '0.7rem',
             fontWeight: 600,
             letterSpacing: '0.04em',
             color: 'var(--color-ink-muted)',
-            marginBottom: 10,
+            marginBottom: 6,
             textTransform: 'uppercase',
           }}
         >
@@ -141,29 +148,18 @@ export default function TaskCard({
         {/* Task text */}
         <p
           style={{
-            fontSize: '1.25rem',
+            fontSize: '1.0625rem',
             fontWeight: 700,
-            lineHeight: 1.4,
+            lineHeight: 1.35,
             color: 'var(--color-ink)',
-            marginBottom: 24,
+            marginBottom: 14,
           }}
         >
-          {task.text}
+          {displayText}
         </p>
 
         {/* Checkbox area */}
-        <p
-          style={{
-            fontSize: '0.8125rem',
-            color: 'var(--color-ink-muted)',
-            marginBottom: 12,
-            textAlign: 'center',
-          }}
-        >
-          Got it? Check it off!
-        </p>
-
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             type="button"
             data-testid="task-checkbox"
@@ -171,16 +167,17 @@ export default function TaskCard({
             aria-label="Mark task complete"
             aria-pressed={checked}
             style={{
-              width: 52,
-              height: 52,
+              width: 44,
+              height: 44,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: checked ? 'default' : 'pointer',
               background: 'transparent',
               border: 'none',
-              padding: 10,
+              padding: 6,
               borderRadius: 'var(--rounded-md)',
+              flexShrink: 0,
             }}
           >
             <motion.div
@@ -224,6 +221,9 @@ export default function TaskCard({
               )}
             </motion.div>
           </button>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--color-ink-muted)' }}>
+            Got it? Check it off!
+          </p>
         </div>
       </motion.div>
 
@@ -233,14 +233,14 @@ export default function TaskCard({
         data-testid="spin-again-btn"
         onClick={onSkip}
         style={{
-          marginTop: 16,
+          marginTop: 8,
           background: 'transparent',
           border: 'none',
           color: 'var(--color-ink-muted)',
-          fontSize: '0.85rem',
+          fontSize: '0.8125rem',
           cursor: 'pointer',
-          padding: '12px 24px',
-          minHeight: 44,
+          padding: '8px 24px',
+          minHeight: 36,
           opacity: completing ? 0 : 1,
           pointerEvents: completing ? 'none' : 'auto',
           transition: 'opacity 0.2s ease',

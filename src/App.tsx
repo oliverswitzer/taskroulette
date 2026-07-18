@@ -16,6 +16,8 @@ import {
   loadAppState,
   saveCompletedCount,
   loadCompletedCount,
+  saveSelectedTask,
+  loadSelectedTask,
   clearAll,
 } from './storage'
 import { MAX_TASKS } from './constants'
@@ -47,16 +49,44 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 function App() {
-  const [appState, setAppState] = useState<AppState>(
-    () => (loadAppState() as AppState | null) ?? 'DUMP'
-  )
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
   const [completedCount, setCompletedCount] = useState<number>(() => loadCompletedCount())
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+
+  // Restore TASK_CARD state: check if there's a persisted selected task
+  const [appState, setAppState] = useState<AppState>(() => {
+    const saved = loadAppState() as AppState | null
+    if (saved === 'TASK_CARD') {
+      // Only valid if a selectedTaskId exists in storage AND that task is in the task list
+      const sel = loadSelectedTask()
+      const allTasks = loadTasks()
+      const found = sel && allTasks.find(t => t.id === sel.taskId && !t.completed)
+      return found ? 'TASK_CARD' : 'WHEEL_IDLE'
+    }
+    return saved ?? 'DUMP'
+  })
+
+  const [selectedTask, setSelectedTask] = useState<Task | null>(() => {
+    const sel = loadSelectedTask()
+    if (!sel) return null
+    const allTasks = loadTasks()
+    return allTasks.find(t => t.id === sel.taskId && !t.completed) ?? null
+  })
+
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(() => {
+    const sel = loadSelectedTask()
+    if (!sel) return null
+    const allTasks = loadTasks().filter(t => !t.completed)
+    const idx = allTasks.findIndex(t => t.id === sel.taskId)
+    return idx >= 0 ? idx : null
+  })
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [parseError, setParseError] = useState<string | undefined>()
-  const [wheelAngle, setWheelAngle] = useState(0)
+
+  const [wheelAngle, setWheelAngle] = useState<number>(() => {
+    const sel = loadSelectedTask()
+    return sel?.angle ?? 0
+  })
   const [dumpPhoto, setDumpPhoto] = useState<File | null>(null)
 
   // Auto-spin signal — incremented each time user hits "spin again"
@@ -159,6 +189,7 @@ function App() {
     setSelectedTask(task)
     setSelectedIndex(index)
     setWheelAngle(finalAngle)
+    saveSelectedTask(task.id, finalAngle)
     setAppState('TASK_CARD')
   }
 
@@ -179,6 +210,7 @@ function App() {
     if (remaining.length === 0) {
       setSelectedTask(null)
       setSelectedIndex(null)
+      saveSelectedTask(null, 0)
       setAppState('ALL_DONE')
     } else if (remaining.length === 1) {
       // Go directly to TASK_CARD for the last task — skipping WHEEL_IDLE avoids
@@ -186,10 +218,12 @@ function App() {
       setSelectedTask(remaining[0])
       setSelectedIndex(0)
       setWheelAngle(0)
+      saveSelectedTask(remaining[0].id, 0)
       setAppState('TASK_CARD')
     } else {
       setSelectedTask(null)
       setSelectedIndex(null)
+      saveSelectedTask(null, 0)
       setAppState('WHEEL_IDLE')
     }
   }
@@ -198,6 +232,7 @@ function App() {
   const handleBackToDump = () => {
     setSelectedTask(null)
     setSelectedIndex(null)
+    saveSelectedTask(null, 0)
     setAppState('DUMP')
   }
 
@@ -205,6 +240,7 @@ function App() {
   const handleSkip = () => {
     setSelectedTask(null)
     setSelectedIndex(null)
+    saveSelectedTask(null, 0)
     setAppState('WHEEL_IDLE')
   }
 
