@@ -8,7 +8,7 @@ import WheelScreen from './components/WheelScreen'
 import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
-import { parseTasks } from './api'
+import { parseTasks, parseTasksFromImage } from './api'
 import {
   saveTasks,
   loadTasks,
@@ -37,6 +37,15 @@ const pageVariants = {
 }
 const pageTransition = { duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '')
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 function App() {
   const [appState, setAppState] = useState<AppState>(
     () => (loadAppState() as AppState | null) ?? 'DUMP'
@@ -48,6 +57,7 @@ function App() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [parseError, setParseError] = useState<string | undefined>()
   const [wheelAngle, setWheelAngle] = useState(0)
+  const [dumpPhoto, setDumpPhoto] = useState<File | null>(null)
 
   // Auto-spin signal — incremented each time user hits "spin again"
   // Using a counter (not a ref) so WheelScreen's useEffect detects the change
@@ -69,11 +79,24 @@ function App() {
   }, [])
 
   // ── DUMP → PARSING ──────────────────────────────────────────────────────────
-  const handleDumpSubmit = async (dump: string) => {
+  const handleDumpSubmit = async (dump: string, photo?: File) => {
     setParseError(undefined)
     setAppState('PARSING')
     try {
-      const parsed = await parseTasks(dump)
+      let parsed: string[]
+      if (photo) {
+        const base64 = await fileToBase64(photo)
+        parsed = await parseTasksFromImage(base64, photo.type, dump || undefined)
+      } else {
+        parsed = await parseTasks(dump)
+      }
+
+      if (parsed.length === 0) {
+        setParseError('No tasks found in your input. Try adding more detail or a clearer photo.')
+        setAppState('DUMP')
+        return
+      }
+
       const newTasks: Task[] = parsed.map((text, i) => ({
         id: String(Date.now() + i),
         text,
@@ -81,6 +104,7 @@ function App() {
         completed: false,
       }))
       setTasks(newTasks)
+      setDumpPhoto(null)
       setAppState('LIST_EDIT')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'
@@ -185,6 +209,7 @@ function App() {
     setCompletedCount(0)
     setSelectedTask(null)
     setSelectedIndex(null)
+    setDumpPhoto(null)
     setAppState('DUMP')
   }
 
@@ -221,7 +246,7 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <DumpScreen onSubmit={handleDumpSubmit} error={parseError} />
+            <DumpScreen onSubmit={handleDumpSubmit} error={parseError} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
           </motion.div>
         )}
 

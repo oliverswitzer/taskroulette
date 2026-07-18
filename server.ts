@@ -63,6 +63,64 @@ Brain dump: "${body.dump}"`
     }
   })
 
+  currentApp.post('/api/parse-image', async (c) => {
+    try {
+      const body = await c.req.json<{ text?: string; imageBase64: string; mimeType: string }>()
+
+      if (!body.imageBase64) {
+        return c.json({ error: 'imageBase64 is required' }, 400)
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic']
+      if (!allowedTypes.includes(body.mimeType)) {
+        return c.json({ error: `Unsupported image type: ${body.mimeType}` }, 400)
+      }
+
+      // Normalize HEIC to JPEG for Claude (Claude doesn't accept image/heic)
+      const mediaType = body.mimeType === 'image/heic' ? 'image/jpeg' : body.mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+
+      const textPart = body.text?.trim()
+        ? `The user also typed this brain dump:\n"${body.text}"\n\n`
+        : ''
+
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: body.imageBase64 },
+            },
+            {
+              type: 'text',
+              text: `${textPart}Extract every concrete, actionable to-do task from the image (and the typed text above, if any).
+Rules:
+- Include tasks from BOTH the image and the typed text — combine them without duplicates
+- Clean up abbreviations and shorthand into full readable tasks
+- Skip anything clearly already done (crossed out, checkmark, "✓", past-tense completion)
+- Start each task with a verb
+- Return ONLY a valid JSON array of strings — no explanation, no markdown, no code blocks
+- Example: ["Call dentist", "Email landlord about leak", "Buy groceries"]`,
+            },
+          ],
+        }],
+      })
+
+      const content = message.content[0]
+      if (content.type !== 'text') return c.json({ error: 'Unexpected response' }, 500)
+
+      const rawText = content.text.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim()
+      const tasks = JSON.parse(rawText) as string[]
+      return c.json({ tasks })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('Parse-image error:', msg)
+      return c.json({ error: msg }, 500)
+    }
+  })
+
   currentApp.get('/api/health', (c) => c.json({ ok: true }))
 
   return currentApp

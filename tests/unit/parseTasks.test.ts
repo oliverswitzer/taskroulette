@@ -56,11 +56,12 @@ describe('parseTasks', () => {
     await expect(parseTasks('')).rejects.toThrow('Parse failed: 400')
   })
 
-  it(`returns max ${MAX_TASKS} items even if server returns more`, async () => {
+  it('returns all items — no client-side cap (cap is enforced in LIST_EDIT UI)', async () => {
     const manyTasks = Array.from({ length: MAX_TASKS + 5 }, (_, i) => `Task ${i}`)
     mockFetchOk(manyTasks)
     const result = await parseTasks('huge brain dump')
-    expect(result).toHaveLength(MAX_TASKS)
+    // Server returns MAX_TASKS+5, client passes them all through — UI caps at MAX_TASKS
+    expect(result).toHaveLength(MAX_TASKS + 5)
   })
 
   it('returns fewer than MAX_TASKS if server returns fewer', async () => {
