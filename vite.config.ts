@@ -3,6 +3,12 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import fs from 'node:fs'
+
+const HOSTNAME = 'clawlivers-mac-mini.tail60e2f.ts.net'
+const certPath = path.resolve(__dirname, `${HOSTNAME}.crt`)
+const keyPath = path.resolve(__dirname, `${HOSTNAME}.key`)
+const hasLocalCert = fs.existsSync(certPath) && fs.existsSync(keyPath)
 
 export default defineConfig({
   plugins: [
@@ -30,9 +36,15 @@ export default defineConfig({
     })
   ],
   server: {
-    host: true,
+    host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['clawlivers-mac-mini.tail60e2f.ts.net'],
+    allowedHosts: [HOSTNAME],
+    ...(hasLocalCert ? {
+      https: {
+        cert: certPath,
+        key: keyPath,
+      },
+    } : {}),
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

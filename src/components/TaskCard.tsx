@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { Task } from '../types'
@@ -34,18 +34,21 @@ export default function TaskCard({
   wheelAngle,
   winningIndex,
   activeTasks,
-  wheelSize,
+  wheelSize: wheelSizeProp,
 }: TaskCardProps) {
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
 
-  // Wheel is smaller on task card to leave room for the card below
-  const computedWheelSize = wheelSize ?? Math.min(window.innerWidth - 40, 280)
-
-  // Clamp long task text so it never blows out the card height
-  const displayText = task.text.length > 60
-    ? task.text.slice(0, 57) + '…'
-    : task.text
+  // Match WheelScreen sizing — full width up to 400px
+  const [computedWheelSize, setComputedWheelSize] = useState(() =>
+    wheelSizeProp ?? Math.min(window.innerWidth - 40, 400)
+  )
+  useEffect(() => {
+    if (wheelSizeProp) return
+    const handleResize = () => setComputedWheelSize(Math.min(window.innerWidth - 40, 400))
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [wheelSizeProp])
 
   const handleCheck = useCallback(() => {
     if (checked || completing) return
@@ -61,13 +64,12 @@ export default function TaskCard({
     <div
       data-testid="task-card"
       style={{
-        height: '100dvh',
+        minHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        padding: '0 20px 16px',
+        padding: '0 20px 40px',
         boxSizing: 'border-box',
-        overflow: 'hidden',
       }}
     >
       {/* Back button — top left */}
@@ -148,14 +150,14 @@ export default function TaskCard({
         {/* Task text */}
         <p
           style={{
-            fontSize: '1.0625rem',
+            fontSize: '1.125rem',
             fontWeight: 700,
             lineHeight: 1.35,
             color: 'var(--color-ink)',
             marginBottom: 14,
           }}
         >
-          {displayText}
+          {task.text}
         </p>
 
         {/* Checkbox area */}
