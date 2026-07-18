@@ -63,8 +63,8 @@ async function main() {
   console.log('App state after check:', appState2)
 
   // Check what screens are visible
-  const taskCard = await pageA.$('[data-testid="task-card"]')
-  const wheelScreen = await pageA.$('[data-testid="wheel-screen"]')
+  const _taskCard = await pageA.$('[data-testid="task-card"]')
+  const _wheelScreen = await pageA.$('[data-testid="wheel-screen"]')
   const allDoneTest = await pageA.evaluate(() => {
     return {
       hasAllDone: !!document.querySelector('[data-testid="all-done"]'),

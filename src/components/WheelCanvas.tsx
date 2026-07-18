@@ -3,7 +3,7 @@ import type { Task } from '../types'
 
 // Precomputed hex equivalents of OKLCH wheel colors for canvas
 // (OKLCH does NOT work in canvas 2D fillStyle directly)
-export const WHEEL_COLORS_HEX = [
+const WHEEL_COLORS_HEX = [
   '#F05A22', // warm orange-red
   '#E09B00', // bright amber
   '#82C900', // vivid lime

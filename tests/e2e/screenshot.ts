@@ -54,7 +54,7 @@ async function main() {
 
     // 5. ListEdit — 15 tasks
     await screenshot(browser, `list-15tasks-${suffix}`, width, async (page) => {
-      await page.evaluate((tasks) => {
+      await page.evaluate((_tasks) => {
         // Set 15 tasks via React state
         window.__setAppState('LIST_EDIT')
       }, FIFTEEN_TASKS)

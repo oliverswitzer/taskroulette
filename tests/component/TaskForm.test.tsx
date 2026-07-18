@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TaskForm from '../../src/components/TaskForm'
 
@@ -91,7 +91,7 @@ describe('TaskForm', () => {
     // Check min-height style is set (JSDOM won't compute layout but we can verify CSS)
     expect(submitBtn).not.toBeNull()
     // Check the computed style references or inline style
-    const style = window.getComputedStyle(submitBtn)
+    const _style = window.getComputedStyle(submitBtn)
     // At minimum, check the button is present — layout is visually tested
     expect(submitBtn.tagName).toBe('BUTTON')
   })

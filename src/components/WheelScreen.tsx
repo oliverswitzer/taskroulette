@@ -23,7 +23,7 @@ export default function WheelScreen({
   onTaskSelected,
   onEditTasks,
   onBackToDump,
-  autoSpinRef,
+  autoSpinRef: _autoSpinRef,
   autoSpinSignal = 0,
 }: WheelScreenProps) {
   // Compute wheel size — cap at container width (480px max), not full viewport

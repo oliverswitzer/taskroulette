@@ -61,7 +61,7 @@ function App() {
 
   // Auto-spin signal — incremented each time user hits "spin again"
   // Using a counter (not a ref) so WheelScreen's useEffect detects the change
-  const [autoSpinSignal, setAutoSpinSignal] = useState(0)
+  const [autoSpinSignal] = useState(0)
 
   // Active (non-completed) tasks
   const activeTasks = tasks.filter(t => !t.completed)
@@ -205,14 +205,6 @@ function App() {
   const handleSkip = () => {
     setSelectedTask(null)
     setSelectedIndex(null)
-    setAppState('WHEEL_IDLE')
-  }
-
-  // ── TASK_CARD → WHEEL_IDLE (spin again after completing — auto-spins) ────────
-  const handleSpinAgain = () => {
-    setSelectedTask(null)
-    setSelectedIndex(null)
-    setAutoSpinSignal(prev => prev + 1)  // increment signal → WheelScreen auto-spins
     setAppState('WHEEL_IDLE')
   }
 
