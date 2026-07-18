@@ -114,6 +114,17 @@ function App() {
     setAppState('WHEEL_IDLE')
   }
 
+  // ── Auto-show task card when only 1 task remains ─────────────────────────────
+  // No need to spin — just show the task directly
+  useEffect(() => {
+    if (appState === 'WHEEL_IDLE' && activeTasks.length === 1) {
+      setSelectedTask(activeTasks[0])
+      setSelectedIndex(0)
+      setWheelAngle(0)
+      setAppState('TASK_CARD')
+    }
+  }, [appState, activeTasks.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── WHEEL_IDLE → WHEEL_SPINNING ─────────────────────────────────────────────
   const handleSpinStart = () => {
     setAppState('WHEEL_SPINNING')

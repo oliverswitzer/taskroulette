@@ -15,7 +15,6 @@ interface WheelScreenProps {
   autoSpinSignal?: number  // increment to trigger auto-spin (avoids StrictMode issues)
 }
 
-const HINT_STORAGE_KEY = 'tr-hint-shown'
 
 export default function WheelScreen({
   tasks,
@@ -52,21 +51,6 @@ export default function WheelScreen({
     finalAngleRef.current = physics.angle
   })
 
-  // Show hint only first time
-  const [showHint, setShowHint] = useState(() => {
-    try {
-      return !localStorage.getItem(HINT_STORAGE_KEY)
-    } catch {
-      return true
-    }
-  })
-
-  const dismissHint = useCallback(() => {
-    setShowHint(false)
-    try {
-      localStorage.setItem(HINT_STORAGE_KEY, '1')
-    } catch { /* ignore */ }
-  }, [])
 
   // Audio tick on slice boundary crossings
   useEffect(() => {
@@ -122,14 +106,11 @@ export default function WheelScreen({
       }
 
       lastAngleRef.current = physics.angle
-      dismissHint()
       onSpinStart?.()
 
-      startSpin(velocity, () => {
-        // handled by the winningSliceIndex effect above
-      })
+      startSpin(velocity, () => {})
     },
-    [isSpinning, tasks.length, physics.angle, onSpinStart, startSpin, dismissHint]
+    [isSpinning, tasks.length, physics.angle, onSpinStart, startSpin]
   )
 
   // Random spin button
@@ -156,40 +137,6 @@ export default function WheelScreen({
     onSpinStart?.()
   })
 
-  // Swipe gesture detection
-  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
-
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    swipeStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() }
-  }, [])
-
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!swipeStartRef.current) return
-      const { x: startX, y: startY, time: startTime } = swipeStartRef.current
-      swipeStartRef.current = null
-
-      const deltaX = e.clientX - startX
-      const deltaY = e.clientY - startY
-      const deltaTime = Date.now() - startTime
-
-      // Only horizontal right swipes
-      if (deltaX < 40) return
-      if (Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return
-      if (deltaTime < 1) return
-
-      const swipeVelocity = deltaX / deltaTime // px/ms
-      const radVelocity = swipeVelocity * 0.008
-
-      if (!audioInitRef.current) {
-        initAudioContext()
-        audioInitRef.current = true
-      }
-
-      triggerSpin(radVelocity)
-    },
-    [triggerSpin]
-  )
 
   const activeBadgeCount = tasks.filter(t => !t.completed).length
 
@@ -207,8 +154,6 @@ export default function WheelScreen({
         position: 'relative',
         overflow: 'hidden',
       }}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
     >
       {/* Top bar */}
       <div
@@ -284,27 +229,10 @@ export default function WheelScreen({
         />
       </motion.div>
 
-      {/* Hint text */}
-      {showHint && !isSpinning && (
-        <motion.p
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.3 }}
-          style={{
-            marginTop: 12,
-            fontSize: '0.8125rem',
-            color: 'var(--color-ink-muted)',
-            textAlign: 'center',
-          }}
-        >
-          Swipe the wheel or tap Spin
-        </motion.p>
-      )}
-
       {/* Spin button */}
       <div
         style={{
-          marginTop: showHint ? 12 : 24,
+          marginTop: 24,
           width: '100%',
           maxWidth: 400,
         }}

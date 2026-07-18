@@ -123,7 +123,7 @@ export default function AllDoneScreen({
             cursor: 'pointer',
           }}
         >
-          Spin again tomorrow →
+          Task dump & spin again →
         </button>
       </motion.div>
     </div>
