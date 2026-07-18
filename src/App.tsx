@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import confetti from 'canvas-confetti'
 import type { AppState, Task } from './types'
 import DumpScreen from './components/DumpScreen'
 import ParsingScreen from './components/ParsingScreen'
@@ -211,6 +212,38 @@ function App() {
       setSelectedTask(null)
       setSelectedIndex(null)
       saveSelectedTask(null, 0)
+
+      // 🎆 Wheel explosion — fires BEFORE screen transition so it bursts from
+      // the wheel's position. 8 radial shards + a central shower.
+      const wheelOrigin = { x: 0.5, y: 0.42 } // wheel center on TaskCard
+      const shardColors = ['#F05A22','#E09B00','#82C900','#1EAA4A','#00A89A','#1D6AFF','#7B2FE0','#E01B7A']
+      // Fire 8 directional bursts — one per wheel color / slice
+      for (let i = 0; i < 8; i++) {
+        const angleDeg = (i / 8) * 360
+        confetti({
+          particleCount: 18,
+          angle: angleDeg,
+          spread: 22,
+          origin: wheelOrigin,
+          colors: [shardColors[i], '#ffffff', shardColors[(i + 1) % 8]],
+          startVelocity: 55,
+          scalar: 0.9,
+          gravity: 0.8,
+          drift: 0,
+        })
+      }
+      // Central burst — pops outward like the hub blowing off
+      confetti({
+        particleCount: 60,
+        spread: 360,
+        origin: wheelOrigin,
+        colors: shardColors,
+        startVelocity: 30,
+        scalar: 1.1,
+        gravity: 0.6,
+        ticks: 200,
+      })
+
       setAppState('ALL_DONE')
     } else if (remaining.length === 1) {
       // Go directly to TASK_CARD for the last task — skipping WHEEL_IDLE avoids
