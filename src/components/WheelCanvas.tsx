@@ -14,7 +14,7 @@ const WHEEL_COLORS_HEX = [
   '#E01B7A', // vivid pink
 ]
 
-// Slightly brighter variants for winning slice (20% luminance boost)
+// Slightly brighter variants for winning slice
 const WHEEL_COLORS_BRIGHT: { [key: string]: string } = {
   '#F05A22': '#FF7A40',
   '#E09B00': '#FFBC20',
@@ -33,9 +33,10 @@ interface WheelCanvasProps {
   angle: number
   winningIndex: number | null
   size: number
+  tickerDeflection?: number // 0–1, how much the ticker is deflected (bounces on peg hit)
 }
 
-export default function WheelCanvas({ tasks, angle, winningIndex, size }: WheelCanvasProps) {
+export default function WheelCanvas({ tasks, angle, winningIndex, size, tickerDeflection = 0 }: WheelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -54,19 +55,46 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size }: WheelC
 
     const cx = size / 2
     const cy = size / 2
-    const radius = size / 2 - 8
+    const rimWidth = Math.max(10, size * 0.055) // thick rim — ~5.5% of diameter
+    const radius = size / 2 - rimWidth - 2
+    const outerRimEdge = size / 2 - 2
 
     ctx.clearRect(0, 0, size, size)
 
+    // ── Outer rim (thick dark border ring) ─────────────────────────────────
+    ctx.save()
+    // Rim fill — dark navy with subtle gradient
+    const rimGrad = ctx.createRadialGradient(cx, cy, radius, cx, cy, outerRimEdge)
+    rimGrad.addColorStop(0, '#1e2440')
+    rimGrad.addColorStop(0.5, '#252d4e')
+    rimGrad.addColorStop(1, '#161c36')
+    ctx.beginPath()
+    ctx.arc(cx, cy, outerRimEdge, 0, TAU)
+    ctx.arc(cx, cy, radius, 0, TAU, true) // inner hole (counter-clockwise = donut)
+    ctx.fillStyle = rimGrad
+    ctx.fill()
+    // Outer edge highlight
+    ctx.beginPath()
+    ctx.arc(cx, cy, outerRimEdge, 0, TAU)
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+    // Inner edge shadow
+    ctx.beginPath()
+    ctx.arc(cx, cy, radius, 0, TAU)
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.restore()
+
     if (tasks.length === 0) {
-      // Empty wheel — just a dark circle
+      // Empty wheel
+      ctx.save()
       ctx.beginPath()
       ctx.arc(cx, cy, radius, 0, TAU)
       ctx.fillStyle = '#1a1a24'
       ctx.fill()
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)'
-      ctx.lineWidth = 2
-      ctx.stroke()
+      ctx.restore()
       return
     }
 
@@ -74,7 +102,7 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size }: WheelC
     const sliceAngle = TAU / count
     const baseStartAngle = -TAU / 4 + angle
 
-    // Draw slices
+    // ── Slices ──────────────────────────────────────────────────────────────
     for (let i = 0; i < count; i++) {
       const sliceStart = baseStartAngle + i * sliceAngle
       const sliceEnd = sliceStart + sliceAngle
@@ -82,67 +110,32 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size }: WheelC
       const isWinner = winningIndex === i
 
       ctx.save()
-
       if (isWinner) {
-        ctx.shadowBlur = 28
+        ctx.shadowBlur = 32
         ctx.shadowColor = color
       }
 
+      // Slight gradient per slice (lighter in center → darker at edge)
+      const sliceCenter = sliceStart + sliceAngle / 2
+      const gradX1 = cx + Math.cos(sliceCenter) * radius * 0.25
+      const gradY1 = cy + Math.sin(sliceCenter) * radius * 0.25
+      const gradX2 = cx + Math.cos(sliceCenter) * radius * 0.95
+      const gradY2 = cy + Math.sin(sliceCenter) * radius * 0.95
+      const sliceGrad = ctx.createLinearGradient(gradX1, gradY1, gradX2, gradY2)
+      const bright = isWinner ? (WHEEL_COLORS_BRIGHT[color] ?? color) : color
+      sliceGrad.addColorStop(0, bright + 'ee')
+      sliceGrad.addColorStop(1, bright + '99')
+
       ctx.beginPath()
       ctx.moveTo(cx, cy)
-      const arcRadius = isWinner ? radius + 4 : radius
-      ctx.arc(cx, cy, arcRadius, sliceStart, sliceEnd)
+      ctx.arc(cx, cy, radius, sliceStart, sliceEnd)
       ctx.closePath()
-
-      ctx.fillStyle = isWinner ? (WHEEL_COLORS_BRIGHT[color] ?? color) : color
+      ctx.fillStyle = sliceGrad
       ctx.fill()
-
       ctx.restore()
     }
 
-    // Outer ring stroke
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(cx, cy, radius, 0, TAU)
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'
-    ctx.lineWidth = 2.5
-    ctx.stroke()
-    ctx.restore()
-
-    // Draw text on each slice (only if slice is wide enough)
-    for (let i = 0; i < count; i++) {
-      if (sliceAngle < 0.3) continue // skip if too small
-
-      const sliceCenter = baseStartAngle + i * sliceAngle + sliceAngle / 2
-      const textRadius = radius * 0.6
-      const tx = cx + Math.cos(sliceCenter) * textRadius
-      const ty = cy + Math.sin(sliceCenter) * textRadius
-
-      const rawText = tasks[i].text
-      const label = rawText.length > 12 ? rawText.slice(0, 12) + '…' : rawText
-      const color = WHEEL_COLORS_HEX[i % WHEEL_COLORS_HEX.length]
-
-      ctx.save()
-      ctx.translate(tx, ty)
-      // Normalize slice center angle to [0, TAU)
-      const normSC = ((sliceCenter % TAU) + TAU) % TAU
-      // For bottom half of wheel, text would render upside-down — flip by PI to keep readable
-      const isBottomHalf = normSC >= Math.PI / 2 && normSC <= (3 * Math.PI / 2)
-      ctx.rotate(isBottomHalf ? sliceCenter - Math.PI / 2 : sliceCenter + Math.PI / 2)
-      ctx.font = 'bold 13px Inter, system-ui, sans-serif'
-      const lightSegments = new Set(['#E09B00', '#82C900', '#1EAA4A'])
-      const isDarkText = lightSegments.has(color)
-      ctx.fillStyle = isDarkText ? 'rgba(10,10,10,0.9)' : 'rgba(255,255,255,0.95)'
-      ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.7)'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      // Draw text shadow for legibility
-      ctx.shadowBlur = 4
-      ctx.fillText(label, 0, 0)
-      ctx.restore()
-    }
-
-    // Slice dividers (thin lines between slices)
+    // ── Slice dividers ──────────────────────────────────────────────────────
     if (count > 1) {
       for (let i = 0; i < count; i++) {
         const lineAngle = baseStartAngle + i * sliceAngle
@@ -150,64 +143,163 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size }: WheelC
         ctx.beginPath()
         ctx.moveTo(cx, cy)
         ctx.lineTo(
-          cx + Math.cos(lineAngle) * (radius + 4),
-          cy + Math.sin(lineAngle) * (radius + 4)
+          cx + Math.cos(lineAngle) * radius,
+          cy + Math.sin(lineAngle) * radius
         )
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)'
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'
         ctx.lineWidth = 2
         ctx.stroke()
         ctx.restore()
       }
     }
 
-    // Notch indicator — sits just above wheel rim at 12 o'clock
-    const notchW = 20
-    const notchH = 22
-    const notchX = cx
-    const notchTip = cy - radius - 2  // tip touches wheel rim
-    const notchTop = notchTip - notchH
-    ctx.save()
-    // Dark outline shadow
-    ctx.beginPath()
-    ctx.moveTo(notchX - notchW / 2, notchTop)
-    ctx.lineTo(notchX + notchW / 2, notchTop)
-    ctx.lineTo(notchX, notchTip)
-    ctx.closePath()
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'
-    ctx.shadowBlur = 0
-    ctx.fill()
-    // White fill
-    ctx.beginPath()
-    ctx.moveTo(notchX - notchW / 2 + 2, notchTop + 2)
-    ctx.lineTo(notchX + notchW / 2 - 2, notchTop + 2)
-    ctx.lineTo(notchX, notchTip - 2)
-    ctx.closePath()
-    ctx.fillStyle = '#ffffff'
-    ctx.shadowBlur = 10
-    ctx.shadowColor = 'rgba(240,90,34,0.9)'
-    ctx.fill()
-    ctx.restore()
+    // ── Pegs — at the outer end of each divider, on the rim ──────────────────
+    // These are what the ticker physically "hits" — drawn as small circles on
+    // the inner edge of the rim, one per slice boundary
+    if (count > 1) {
+      const pegRadius = Math.max(3.5, size * 0.012)
+      const pegDist = radius + rimWidth * 0.45 // sits in the middle of the rim
+      for (let i = 0; i < count; i++) {
+        const pegAngle = baseStartAngle + i * sliceAngle
+        const px = cx + Math.cos(pegAngle) * pegDist
+        const py = cy + Math.sin(pegAngle) * pegDist
 
-    // Center circle — dark overlay to cover the converging point
+        // Peg glow — subtle warm highlight
+        ctx.save()
+        ctx.shadowBlur = 6
+        ctx.shadowColor = 'rgba(255, 220, 120, 0.7)'
+        ctx.beginPath()
+        ctx.arc(px, py, pegRadius, 0, TAU)
+        // Warm cream/white fill — like a carnival light bulb
+        const pegGrad = ctx.createRadialGradient(px - pegRadius * 0.3, py - pegRadius * 0.3, 0, px, py, pegRadius)
+        pegGrad.addColorStop(0, '#fff9e0')
+        pegGrad.addColorStop(0.6, '#f0d060')
+        pegGrad.addColorStop(1, '#c08020')
+        ctx.fillStyle = pegGrad
+        ctx.fill()
+        ctx.restore()
+      }
+    }
+
+    // ── Text labels ─────────────────────────────────────────────────────────
+    for (let i = 0; i < count; i++) {
+      if (sliceAngle < 0.28) continue
+
+      const sliceMid = baseStartAngle + i * sliceAngle + sliceAngle / 2
+      const textRadius = radius * 0.62
+      const tx = cx + Math.cos(sliceMid) * textRadius
+      const ty = cy + Math.sin(sliceMid) * textRadius
+
+      const rawText = tasks[i].text
+      const label = rawText.length > 12 ? rawText.slice(0, 11) + '…' : rawText
+      const color = WHEEL_COLORS_HEX[i % WHEEL_COLORS_HEX.length]
+      const isWinner = winningIndex === i
+
+      ctx.save()
+      ctx.translate(tx, ty)
+      const normSC = ((sliceMid % TAU) + TAU) % TAU
+      const isBottomHalf = normSC >= Math.PI / 2 && normSC <= (3 * Math.PI) / 2
+      ctx.rotate(isBottomHalf ? sliceMid - Math.PI / 2 : sliceMid + Math.PI / 2)
+
+      const fontSize = Math.max(10, Math.min(14, size * 0.034))
+      ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`
+      const lightSegments = new Set(['#E09B00', '#82C900', '#1EAA4A'])
+      const isDarkText = lightSegments.has(color)
+      ctx.fillStyle = isDarkText ? 'rgba(10,10,10,0.92)' : 'rgba(255,255,255,0.97)'
+      ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.8)'
+      ctx.shadowBlur = isWinner ? 8 : 4
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(label, 0, 0)
+      ctx.restore()
+    }
+
+    // ── Center hub ───────────────────────────────────────────────────────────
+    const hubRadius = Math.max(16, size * 0.078)
     ctx.save()
+    const hubGrad = ctx.createRadialGradient(cx - hubRadius * 0.2, cy - hubRadius * 0.2, 0, cx, cy, hubRadius)
+    hubGrad.addColorStop(0, '#2a2f52')
+    hubGrad.addColorStop(0.7, '#1a1f3a')
+    hubGrad.addColorStop(1, '#10142a')
     ctx.beginPath()
-    ctx.arc(cx, cy, 20, 0, TAU)
-    ctx.fillStyle = '#1a1a24'
+    ctx.arc(cx, cy, hubRadius, 0, TAU)
+    ctx.fillStyle = hubGrad
+    ctx.shadowBlur = 8
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'
     ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'
+    ctx.lineWidth = 1.5
     ctx.stroke()
     ctx.restore()
+
   }, [tasks, angle, winningIndex, size])
 
+  // The ticker/pointer is drawn as a DOM element so it can animate independently
+  // (bounce on peg hit without needing a canvas redraw)
+  const tickerSize = Math.max(22, size * 0.09)
+  // tickerDeflection: 0 = upright, 1 = fully deflected right (15deg)
+  const deflectDeg = tickerDeflection * 15
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        display: 'block',
-        borderRadius: '50%',
-      }}
-      aria-label="Task roulette wheel"
-    />
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <canvas
+        ref={canvasRef}
+        style={{ display: 'block', borderRadius: '50%' }}
+        aria-label="Task roulette wheel"
+      />
+      {/* Ticker pointer — sits outside canvas, pivots at top */}
+      <div
+        style={{
+          position: 'absolute',
+          top: -tickerSize * 0.15,
+          left: '50%',
+          transform: `translateX(-50%)`,
+          width: tickerSize,
+          height: tickerSize * 1.15,
+          pointerEvents: 'none',
+          transformOrigin: '50% 10%',
+          // Bounce animation on peg hit — rotate right then spring back
+          transition: deflectDeg > 0
+            ? 'none'
+            : 'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          rotate: `${deflectDeg}deg`,
+        }}
+      >
+        <svg
+          width={tickerSize}
+          height={tickerSize * 1.15}
+          viewBox="0 0 40 46"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Drop shadow filter */}
+          <defs>
+            <filter id="tickerShadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.5" />
+            </filter>
+          </defs>
+          {/* Thick orange/amber pointer triangle */}
+          <polygon
+            points="20,46 4,8 36,8"
+            fill="#F5A623"
+            filter="url(#tickerShadow)"
+          />
+          {/* Lighter center highlight */}
+          <polygon
+            points="20,40 8,12 32,12"
+            fill="#FFD060"
+            opacity="0.6"
+          />
+          {/* Dark outline for definition */}
+          <polygon
+            points="20,46 4,8 36,8"
+            fill="none"
+            stroke="rgba(0,0,0,0.4)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    </div>
   )
 }

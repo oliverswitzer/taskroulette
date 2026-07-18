@@ -42,9 +42,12 @@ export default function WheelScreen({
   const { physics, startSpin } = useWheelPhysics(tasks.length)
   const isSpinning = physics.isSpinning
 
+  // Ticker deflection state — bounces on each peg hit
+  const [tickerDeflection, setTickerDeflection] = useState(0)
+  const tickerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Track last angle for audio notch crossings
   const lastAngleRef = useRef<number>(0)
-  const lastTickTimeRef = useRef<number>(0)
   const audioInitRef = useRef<boolean>(false)
 
   // Track final angle for when spin completes
@@ -54,7 +57,7 @@ export default function WheelScreen({
   })
 
 
-  // Audio tick on slice boundary crossings
+  // Peg hit detection — fires audio + ticker bounce on each slice boundary crossing
   useEffect(() => {
     if (!isSpinning) return
     const count = tasks.length
@@ -65,20 +68,21 @@ export default function WheelScreen({
     const prevNorm = ((lastAngleRef.current % TAU) + TAU) % TAU
     const currNorm = ((physics.angle % TAU) + TAU) % TAU
 
-    // Count how many boundaries we crossed
     const prevSlice = Math.floor(prevNorm / sliceAngle)
     const currSlice = Math.floor(currNorm / sliceAngle)
 
     if (prevSlice !== currSlice) {
-      const now = performance.now()
-      if (now - lastTickTimeRef.current > 16) {
-        lastTickTimeRef.current = now
-        playTick(physics.velocity)
-      }
+      // Peg hit — play click
+      playTick(physics.velocity)
+
+      // Ticker bounce: snap to deflected position, then spring back
+      if (tickerTimeoutRef.current) clearTimeout(tickerTimeoutRef.current)
+      setTickerDeflection(1)
+      tickerTimeoutRef.current = setTimeout(() => setTickerDeflection(0), 60)
     }
 
     lastAngleRef.current = physics.angle
-  }, [physics.angle, physics.velocity, isSpinning, tasks.length])
+  }, [physics.angle, physics.velocity, isSpinning, tasks.length, tickerDeflection])
 
   // Transition to TASK_CARD when spin completes (after 600ms glow hold)
   const spinTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -256,6 +260,7 @@ export default function WheelScreen({
           angle={physics.angle}
           winningIndex={physics.winningSliceIndex}
           size={wheelSize}
+          tickerDeflection={tickerDeflection}
         />
       </motion.div>
 

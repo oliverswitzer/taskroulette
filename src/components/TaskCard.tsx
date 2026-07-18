@@ -103,6 +103,7 @@ export default function TaskCard({
             angle={wheelAngle}
             winningIndex={winningIndex}
             size={computedWheelSize}
+            tickerDeflection={0}
           />
         </div>
       </div>

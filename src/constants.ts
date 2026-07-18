@@ -4,11 +4,11 @@ export const MAX_TASK_LENGTH = 80
 export const MAX_TASK_DISPLAY_LENGTH = 12 // chars on wheel slice before truncation
 
 // Physics
-export const WHEEL_FRICTION = 0.025      // velocity decay per frame
-export const MIN_VELOCITY = 0.0005       // rad/ms -- stop threshold
-export const MAX_SPIN_MS = 5000          // hard cap
-export const MIN_SWIPE_VELOCITY = 0.002  // minimum useful swipe speed
-export const MAX_SWIPE_VELOCITY = 0.015  // cap so it doesn't fly off
+export const WHEEL_FRICTION = 0.016      // velocity decay per frame (time-corrected) — gives 4-5s spins
+export const MIN_VELOCITY = 0.0004       // rad/ms -- stop threshold
+export const MAX_SPIN_MS = 5500          // hard cap (generous for full slowdown)
+export const MIN_SWIPE_VELOCITY = 0.035  // rad/ms ~5.5 rot/sec — visibly fast
+export const MAX_SWIPE_VELOCITY = 0.072  // rad/ms ~11.5 rot/sec — really flies
 
 // Audio
 export const TICK_BUFFER_DURATION = 0.008 // seconds -- 8ms noise burst

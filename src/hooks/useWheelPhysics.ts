@@ -76,8 +76,10 @@ export function useWheelPhysics(sliceCount: number) {
     const deltaTime = Math.min(timestamp - lastTimestampRef.current, 50) // cap at 50ms to handle tab-switch gaps
     lastTimestampRef.current = timestamp
 
-    // Decay velocity
-    velocityRef.current = decayVelocity(velocityRef.current)
+    // Time-based friction decay — frame-rate independent
+    // Each ms: velocity *= (1 - WHEEL_FRICTION)^(deltaTime/16.67)
+    const frictionFactor = Math.pow(1 - WHEEL_FRICTION, deltaTime / 16.67)
+    velocityRef.current = velocityRef.current * frictionFactor
     // Advance angle
     angleRef.current = angleRef.current + velocityRef.current * deltaTime
 
