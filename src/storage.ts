@@ -34,10 +34,26 @@ export function saveAppState(state: AppState): void {
   }
 }
 
+// States that are safe to restore on cold boot.
+// Transient states (WHEEL_SPINNING, TASK_CARD, PARSING) have ephemeral
+// runtime data (selectedTask, physics) that isn't persisted — restoring
+// them causes blank screens. Map them back to the nearest safe state.
+const SAFE_STATES: Record<string, AppState> = {
+  DUMP: 'DUMP',
+  LIST_EDIT: 'LIST_EDIT',
+  WHEEL_IDLE: 'WHEEL_IDLE',
+  ALL_DONE: 'ALL_DONE',
+  // Transient — remap to safe equivalents
+  PARSING: 'DUMP',
+  WHEEL_SPINNING: 'WHEEL_IDLE',
+  TASK_CARD: 'WHEEL_IDLE',
+}
+
 export function loadAppState(): AppState | null {
   try {
     const raw = localStorage.getItem(KEYS.appState)
-    return raw as AppState | null
+    if (!raw) return null
+    return SAFE_STATES[raw] ?? null
   } catch {
     return null
   }
