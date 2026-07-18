@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
 import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
+import { hapticSpinLaunch, hapticWheelLand } from '../haptics'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
@@ -95,7 +96,7 @@ export default function WheelScreen({
       const finalAngle = finalAngleRef.current
 
       suspendAudioContext()
-
+      hapticWheelLand() // works on Android; iOS 18.4+ may ignore (outside click grant)
       spinTransitionRef.current = setTimeout(() => {
         if (tasks[winnerIndex]) {
           onTaskSelected(tasks[winnerIndex], winnerIndex, finalAngle)
@@ -124,6 +125,7 @@ export default function WheelScreen({
 
   // Random spin button
   const handleSpinClick = useCallback(() => {
+    hapticSpinLaunch() // must be synchronous in gesture tick — iOS 18.4+
     const velocity =
       MIN_SWIPE_VELOCITY +
       Math.random() * (MAX_SWIPE_VELOCITY * 0.8 - MIN_SWIPE_VELOCITY)
