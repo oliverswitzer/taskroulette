@@ -1,17 +1,109 @@
-import { useState } from 'react'
-import type { AppState } from './types'
+import { useState, useEffect } from 'react'
+import type { AppState, Task } from './types'
+import DumpScreen from './components/DumpScreen'
+import ParsingScreen from './components/ParsingScreen'
+import ListEditScreen from './components/ListEditScreen'
+
+// Expose state setter for Playwright testing
+declare global {
+  interface Window {
+    __setAppState: (state: AppState) => void
+    __setTasks: (tasks: Task[]) => void
+  }
+}
+
+const SAMPLE_TASKS: Task[] = [
+  { id: '1', text: 'Call dentist and schedule overdue cleaning', position: 0, completed: false },
+  { id: '2', text: 'Finish quarterly report for Monday meeting', position: 1, completed: false },
+  { id: '3', text: 'Email Sarah about project handoff', position: 2, completed: false },
+]
 
 function App() {
-  const [appState, _setAppState] = useState<AppState>('DUMP')
-  
+  const [appState, setAppState] = useState<AppState>('DUMP')
+  const [tasks, setTasks] = useState<Task[]>(SAMPLE_TASKS)
+
+  useEffect(() => {
+    window.__setAppState = setAppState
+    window.__setTasks = setTasks
+  }, [])
+
+  const handleDumpSubmit = (dump: string) => {
+    console.log('Dump submitted:', dump)
+    setAppState('PARSING')
+    setTimeout(() => setAppState('LIST_EDIT'), 2000)
+  }
+
+  const handleAddTask = (text: string) => {
+    const newTask: Task = {
+      id: String(Date.now()),
+      text,
+      position: tasks.length,
+      completed: false,
+    }
+    setTasks(prev => [...prev, newTask])
+  }
+
+  const handleEditTask = (id: string, text: string) => {
+    setTasks(prev =>
+      prev.map(t => (t.id === id ? { ...t, text } : t))
+    )
+  }
+
+  const handleDeleteTask = (id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  const handleProceed = () => {
+    setAppState('WHEEL_IDLE')
+  }
+
   return (
-    <div style={{ 
-      minHeight: '100dvh', 
-      background: 'oklch(12% 0.02 260)',
-      color: 'oklch(95% 0.01 260)',
-      fontFamily: 'Inter, system-ui, sans-serif'
-    }}>
-      <p style={{ padding: 20 }}>TaskRoulette -- {appState}</p>
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: 'var(--color-base)',
+        color: 'var(--color-ink)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      {appState === 'DUMP' && (
+        <DumpScreen onSubmit={handleDumpSubmit} />
+      )}
+      {appState === 'PARSING' && (
+        <ParsingScreen />
+      )}
+      {appState === 'LIST_EDIT' && (
+        <ListEditScreen
+          tasks={tasks}
+          onAddTask={handleAddTask}
+          onEditTask={handleEditTask}
+          onDeleteTask={handleDeleteTask}
+          onProceed={handleProceed}
+          canAddMore={tasks.length < 15}
+        />
+      )}
+      {!['DUMP', 'PARSING', 'LIST_EDIT'].includes(appState) && (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-ink-muted)' }}>
+          <p>Screen: {appState} (not yet implemented in Phase 2B)</p>
+          <button
+            type="button"
+            onClick={() => setAppState('DUMP')}
+            style={{
+              marginTop: 16,
+              background: 'var(--color-accent)',
+              color: 'oklch(10% 0.01 30)',
+              border: 'none',
+              borderRadius: 'var(--rounded-md)',
+              padding: '12px 24px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+            }}
+          >
+            Back to Dump
+          </button>
+        </div>
+      )}
     </div>
   )
 }
