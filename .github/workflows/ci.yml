@@ -38,3 +38,12 @@ jobs:
         run: npm run test:e2e
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # Only deploy on push to main (not PRs) and only if all tests passed
+      - name: Deploy to Vercel
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" \
+            -d '{}' \
+            -o /dev/null \
+            -w "Deploy hook status: %{http_code}\n"
