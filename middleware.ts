@@ -4,11 +4,14 @@
 
 import { next } from '@vercel/edge'
 
-const USERNAME = 'adhd'
-const PASSWORD = 'builds'
-const VALID_TOKEN = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`
+const USERNAME = process.env.BASIC_AUTH_USER ?? ''
+const PASSWORD = process.env.BASIC_AUTH_PASS ?? ''
 
 export default function middleware(req: Request): Response {
+  // If env vars aren't set, skip auth (local dev)
+  if (!USERNAME || !PASSWORD) return next()
+
+  const VALID_TOKEN = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`
   const auth = req.headers.get('authorization')
 
   if (auth === VALID_TOKEN) return next()

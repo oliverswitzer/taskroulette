@@ -13,8 +13,8 @@ export default defineConfig({
     baseURL: 'https://taskroulette.vercel.app',
     ignoreHTTPSErrors: false,
     httpCredentials: {
-      username: 'adhd',
-      password: 'builds',
+      username: process.env.BASIC_AUTH_USER ?? 'adhd',
+      password: process.env.BASIC_AUTH_PASS ?? 'builds',
     },
     trace: 'on-first-retry',
     screenshot: 'on-first-retry',

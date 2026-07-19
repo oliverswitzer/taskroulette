@@ -38,6 +38,8 @@ jobs:
         run: npx playwright test --config=playwright.vercel.config.ts
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASIC_AUTH_USER: ${{ secrets.BASIC_AUTH_USER }}
+          BASIC_AUTH_PASS: ${{ secrets.BASIC_AUTH_PASS }}
 
       # Deploy to Vercel only on push to main, only if all tests passed
       - name: Deploy to Vercel
