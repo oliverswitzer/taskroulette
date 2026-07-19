@@ -87,9 +87,9 @@ test.describe('Wheel screen', () => {
     // Wait for the task text to change to the second task
     await expect(page.locator('[data-testid="task-card"]')).toContainText('Second task', { timeout: 10000 })
     await page.locator('[data-testid="task-checkbox"]').click()
-    // All done screen — allow extra time for 800ms completing animation + confetti + transition
+    // All done screen — allow extra time for completing animation + confetti + AI message fetch
     const allDone = page.locator('[data-testid="all-done-screen"]')
-    await expect(allDone).toBeVisible({ timeout: 8000 })
+    await expect(allDone).toBeVisible({ timeout: 20000 })
     await page.screenshot({ path: 'tests/e2e/screenshots/all-done-mobile.png' })
   })
 
