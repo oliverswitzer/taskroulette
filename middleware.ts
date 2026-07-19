@@ -4,8 +4,8 @@
 
 import { next } from '@vercel/edge'
 
-const USERNAME = 'adhdfounderbuilds'
-const PASSWORD = 'adhdfounderbuilds'
+const USERNAME = 'adhd'
+const PASSWORD = 'builds'
 const VALID_TOKEN = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`
 
 export default function middleware(req: Request): Response {
