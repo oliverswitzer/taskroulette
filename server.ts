@@ -1,19 +1,9 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { serve } from '@hono/node-server'
 import Anthropic from '@anthropic-ai/sdk'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
 
 function getAnthropicKey(): string {
-  const envrcPath = path.join(process.env['HOME'] || '', '.envrc')
-  try {
-    const content = fs.readFileSync(envrcPath, 'utf8')
-    const match = content.match(/ANTHROPIC_API_KEY=["']?([^"'\n]+)["']?/)
-    return match?.[1]?.trim() ?? ''
-  } catch {
-    return process.env['ANTHROPIC_API_KEY'] ?? ''
-  }
+  return process.env['ANTHROPIC_API_KEY'] ?? ''
 }
 
 const anthropic = new Anthropic({ apiKey: getAnthropicKey() })
@@ -127,6 +117,7 @@ Rules:
 }
 
 if (process.env['NODE_ENV'] !== 'test') {
+  const { serve } = await import('@hono/node-server')
   const serverApp = createApp()
   serve({ fetch: serverApp.fetch, port: 3001 }, () => {
     console.log('TaskRoulette server running on port 3001')
