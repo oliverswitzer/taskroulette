@@ -39,11 +39,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      # Only deploy on push to main (not PRs) and only if all tests passed
+      # Deploy to Vercel only on push to main, only if all tests passed
       - name: Deploy to Vercel
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          curl -s -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}" \
-            -d '{}' \
-            -o /dev/null \
-            -w "Deploy hook status: %{http_code}\n"
+        run: npx vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
