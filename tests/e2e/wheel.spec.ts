@@ -82,14 +82,16 @@ test.describe('Wheel screen', () => {
     await page.getByRole('button', { name: /spin/i }).click()
     const taskCard = page.locator('[data-testid="task-card"]')
     await expect(taskCard).toBeVisible({ timeout: 10000 })
-    await page.locator('[data-testid="task-checkbox"]').click()
+    const checkbox = page.locator('[data-testid="task-checkbox"]')
+    await checkbox.click()
     // After completing task 1, app auto-selects task 2 (card stays visible, content changes)
-    // Wait for the task text to change to the second task
+    // Wait for the task text to update AND the checkbox to be re-enabled before clicking
     await expect(page.locator('[data-testid="task-card"]')).toContainText('Second task', { timeout: 10000 })
-    await page.locator('[data-testid="task-checkbox"]').click()
-    // All done screen — allow extra time for completing animation + confetti + AI message fetch
+    await expect(checkbox).toBeEnabled({ timeout: 5000 })
+    await checkbox.click()
+    // All done screen — fires after 0 remaining + confetti burst (~800ms total)
     const allDone = page.locator('[data-testid="all-done-screen"]')
-    await expect(allDone).toBeVisible({ timeout: 20000 })
+    await expect(allDone).toBeVisible({ timeout: 8000 })
     await page.screenshot({ path: 'tests/e2e/screenshots/all-done-mobile.png' })
   })
 
