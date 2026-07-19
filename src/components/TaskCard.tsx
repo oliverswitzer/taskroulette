@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { Task } from '../types'
 import WheelCanvas from './WheelCanvas'
-import { hapticTaskComplete } from '../haptics'
 
 interface TaskCardProps {
   task: Task
@@ -54,7 +53,6 @@ export default function TaskCard({
   const handleCheck = useCallback(() => {
     if (checked || completing) return
     setChecked(true)
-    hapticTaskComplete() // synchronous in click gesture — best iOS haptic chance
     fireConfetti()
     setCompleting(true)
     setTimeout(() => {
