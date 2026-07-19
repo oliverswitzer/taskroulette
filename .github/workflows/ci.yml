@@ -35,7 +35,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: E2E tests
-        run: npm run test:e2e
+        run: npx playwright test --config=playwright.vercel.config.ts
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
