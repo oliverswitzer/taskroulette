@@ -8,7 +8,7 @@ export default defineConfig({
   retries: 0,
   reporter: 'html',
   use: {
-    baseURL: 'https://localhost:5173',
+    baseURL: process.env['CI'] ? 'http://localhost:5173' : 'https://localhost:5173',
     ignoreHTTPSErrors: true,
     trace: 'on-first-retry',
     screenshot: 'on-first-retry',
@@ -37,8 +37,8 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev',
-      url: 'https://localhost:5173',
-      reuseExistingServer: true,
+      url: process.env['CI'] ? 'http://localhost:5173' : 'https://localhost:5173',
+      reuseExistingServer: !process.env['CI'],
       timeout: 30000,
       ignoreHTTPSErrors: true,
     },

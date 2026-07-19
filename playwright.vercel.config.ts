@@ -6,6 +6,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   outputDir: './tests/e2e/test-output',
   fullyParallel: false,
+  workers: 1,
   forbidOnly: false,
   retries: 1,
   reporter: 'list',
@@ -14,7 +15,7 @@ export default defineConfig({
     ignoreHTTPSErrors: false,
     httpCredentials: {
       username: process.env.BASIC_AUTH_USER ?? 'adhd',
-      password: process.env.BASIC_AUTH_PASS ?? 'builds',
+      password: process.env.BASIC_AUTH_PASS ?? 'founderbuilds',
     },
     trace: 'on-first-retry',
     screenshot: 'on-first-retry',

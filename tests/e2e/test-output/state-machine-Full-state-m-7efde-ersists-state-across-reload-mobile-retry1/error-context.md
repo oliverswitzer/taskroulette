@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: state-machine.spec.ts >> Full state machine >> start fresh from all-done resets to dump
-- Location: tests/e2e/state-machine.spec.ts:25:3
+- Name: state-machine.spec.ts >> Full state machine >> localStorage persists state across reload
+- Location: tests/e2e/state-machine.spec.ts:4:3
 
 # Error details
 
@@ -29,7 +29,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   - contentinfo [ref=e6]:
     - generic [ref=e7]:
       - paragraph [ref=e8]: Vercel Security Checkpoint
-      - paragraph [ref=e9]: iad1::1784478523-YKWlZIlS5mPVQrzU21ZBkiL60FfJrMXh
+      - paragraph [ref=e9]: iad1::1784478491-itVF1inltU5kZ63zKkwwC7Za8PxmEF8Q
 ```
 
 # Test source
@@ -40,7 +40,8 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   3  | test.describe('Full state machine', () => {
   4  |   test('localStorage persists state across reload', async ({ page }) => {
   5  |     await page.goto('/')
-  6  |     await page.waitForFunction(() => typeof window.__setAppState !== 'undefined')
+> 6  |     await page.waitForFunction(() => typeof window.__setAppState !== 'undefined')
+     |                ^ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   7  |     // Set tasks and go to wheel
   8  |     await page.evaluate(() => {
   9  |       const tasks = [
@@ -61,8 +62,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   24 | 
   25 |   test('start fresh from all-done resets to dump', async ({ page }) => {
   26 |     await page.goto('/')
-> 27 |     await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 10000 })
-     |                ^ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
+  27 |     await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 10000 })
   28 |     await page.evaluate(() => {
   29 |       window.__setAppState('ALL_DONE')
   30 |       ;(window as Window & typeof globalThis & { __setCompletedCount?: (n: number) => void }).__setCompletedCount?.(3)

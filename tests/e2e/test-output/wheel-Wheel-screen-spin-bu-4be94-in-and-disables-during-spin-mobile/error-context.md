@@ -6,39 +6,43 @@
 
 # Test info
 
-- Name: wheel.spec.ts >> Wheel screen >> spin again returns to wheel and auto-spins
-- Location: tests/e2e/wheel.spec.ts:90:3
+- Name: wheel.spec.ts >> Wheel screen >> spin button triggers spin and disables during spin
+- Location: tests/e2e/wheel.spec.ts:43:3
 
 # Error details
 
 ```
-Error: expect(locator).toBeDisabled() failed
-
-Locator:  getByRole('button', { name: /spin/i })
-Expected: disabled
-Received: enabled
-Timeout:  4000ms
-
-Call log:
-  - Expect "toBeDisabled" with timeout 4000ms
-  - waiting for getByRole('button', { name: /spin/i })
-    12 × locator resolved to <button tabindex="0" type="button" aria-label="Spin the wheel">Spin →</button>
-       - unexpected value "enabled"
-
+Test timeout of 30000ms exceeded.
 ```
 
+```
+Error: page.waitForFunction: Test timeout of 30000ms exceeded.
+```
+
+# Page snapshot
+
 ```yaml
-- button "Spin the wheel": Spin →
+- generic [ref=e2]:
+  - main [ref=e3]:
+    - paragraph [ref=e4]: Failed to verify your browser
+    - paragraph [ref=e5]: Code 21
+  - contentinfo [ref=e6]:
+    - generic [ref=e7]:
+      - paragraph [ref=e8]: Vercel Security Checkpoint
+      - paragraph [ref=e9]: iad1::1784478712-veJ6X5EgpXHof4nIqEYUpczIXKWXLWTo
 ```
 
 # Test source
 
 ```ts
+  1   | import { test, expect, type Page } from '@playwright/test'
+  2   | 
   3   | // Helper: get app to WHEEL_IDLE state with N tasks via window helpers
   4   | async function goToWheel(page: Page, taskTexts: string[]) {
   5   |   await page.goto('/')
   6   |   // Use window helpers to skip the dump/parse flow
-  7   |   await page.waitForFunction(() => typeof window.__setAppState !== 'undefined')
+> 7   |   await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 15000 })
+      |              ^ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   8   |   await page.evaluate((texts: string[]) => {
   9   |     const tasks = texts.map((text, i) => ({
   10  |       id: String(i + 1),
@@ -50,7 +54,7 @@ Call log:
   16  |     window.__setAppState('WHEEL_IDLE')
   17  |   }, taskTexts)
   18  |   // Wait for wheel screen to appear
-  19  |   await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 3000 })
+  19  |   await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 8000 })
   20  | }
   21  | 
   22  | test.describe('Wheel screen', () => {
@@ -109,47 +113,34 @@ Call log:
   75  |   })
   76  | 
   77  |   test('completing last task shows all-done screen', async ({ page }) => {
-  78  |     test.setTimeout(15000)
-  79  |     await goToWheel(page, ['Only task'])
-  80  |     await page.getByRole('button', { name: /spin/i }).click()
-  81  |     const taskCard = page.locator('[data-testid="task-card"]')
-  82  |     await expect(taskCard).toBeVisible({ timeout: 8000 })
-  83  |     await page.locator('[data-testid="task-checkbox"]').click()
-  84  |     // All done screen
-  85  |     const allDone = page.locator('[data-testid="all-done-screen"]')
-  86  |     await expect(allDone).toBeVisible({ timeout: 3000 })
-  87  |     await page.screenshot({ path: 'tests/e2e/screenshots/all-done-mobile.png' })
-  88  |   })
-  89  | 
-  90  |   test('spin again returns to wheel and auto-spins', async ({ page }) => {
-  91  |     test.setTimeout(20000)
-  92  |     await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
-  93  |     await page.getByRole('button', { name: /spin/i }).click()
-  94  |     const taskCard = page.locator('[data-testid="task-card"]')
-  95  |     await expect(taskCard).toBeVisible({ timeout: 8000 })
-  96  |     // Click skip/spin again
-  97  |     const skipBtn = page.locator('[data-testid="spin-again-btn"]')
-  98  |     await skipBtn.click()
-  99  |     // Wait for wheel screen to appear first, then check spinning state
-  100 |     await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 3000 })
-  101 |     // Wheel should be spinning again (spin button disabled) — auto-spin fires after 200ms delay
-  102 |     const spinBtn = page.getByRole('button', { name: /spin/i })
-> 103 |     await expect(spinBtn).toBeDisabled({ timeout: 4000 })
-      |                           ^ Error: expect(locator).toBeDisabled() failed
-  104 |   })
-  105 | 
-  106 |   test('edit modal opens and closes from wheel', async ({ page }) => {
-  107 |     await goToWheel(page, ['Call dentist', 'Buy groceries'])
-  108 |     const editBtn = page.locator('[data-testid="edit-tasks-btn"]')
-  109 |     await editBtn.click()
-  110 |     const modal = page.locator('[data-testid="edit-modal"]')
-  111 |     await expect(modal).toBeVisible()
-  112 |     await page.screenshot({ path: 'tests/e2e/screenshots/edit-modal-mobile.png' })
-  113 |     // Close by clicking Done
-  114 |     const doneBtn = page.getByRole('button', { name: /done/i })
-  115 |     await doneBtn.click()
-  116 |     await expect(modal).not.toBeVisible()
-  117 |   })
-  118 | })
-  119 | 
+  78  |     test.setTimeout(30000)
+  79  |     // Use 2 tasks so the wheel actually renders, then complete both
+  80  |     await goToWheel(page, ['Only task', 'Second task'])
+  81  |     // Spin and complete first task
+  82  |     await page.getByRole('button', { name: /spin/i }).click()
+  83  |     const taskCard = page.locator('[data-testid="task-card"]')
+  84  |     await expect(taskCard).toBeVisible({ timeout: 10000 })
+  85  |     await page.locator('[data-testid="task-checkbox"]').click()
+  86  |     // Wait for first completion animation (800ms) + transition to next task card
+  87  |     await expect(taskCard).toBeHidden({ timeout: 5000 })
+  88  |     // With 1 task remaining, app auto-shows task card (no spin needed)
+  89  |     await expect(taskCard).toBeVisible({ timeout: 10000 })
+  90  |     await page.locator('[data-testid="task-checkbox"]').click()
+  91  |     // All done screen — allow extra time for 800ms completing animation + confetti + transition
+  92  |     const allDone = page.locator('[data-testid="all-done-screen"]')
+  93  |     await expect(allDone).toBeVisible({ timeout: 8000 })
+  94  |     await page.screenshot({ path: 'tests/e2e/screenshots/all-done-mobile.png' })
+  95  |   })
+  96  | 
+  97  |   test('spin again returns to wheel and auto-spins', async ({ page }) => {
+  98  |     test.setTimeout(40000)
+  99  |     await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+  100 |     await page.getByRole('button', { name: /spin/i }).click()
+  101 |     const taskCard = page.locator('[data-testid="task-card"]')
+  102 |     await expect(taskCard).toBeVisible({ timeout: 10000 })
+  103 |     // Click skip/spin again
+  104 |     const skipBtn = page.locator('[data-testid="spin-again-btn"]')
+  105 |     await skipBtn.click()
+  106 |     // Auto-spin fires immediately — the wheel spins and lands on a new task card.
+  107 |     // We verify by waiting for another task card to appear (the auto-spin completed).
 ```

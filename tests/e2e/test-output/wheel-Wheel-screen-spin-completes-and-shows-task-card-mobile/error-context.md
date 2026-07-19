@@ -6,17 +6,17 @@
 
 # Test info
 
-- Name: wheel.spec.ts >> Wheel screen >> completing last task shows all-done screen
-- Location: tests/e2e/wheel.spec.ts:77:3
+- Name: wheel.spec.ts >> Wheel screen >> spin completes and shows task card
+- Location: tests/e2e/wheel.spec.ts:51:3
 
 # Error details
 
 ```
-Test timeout of 30000ms exceeded.
+Test timeout of 15000ms exceeded.
 ```
 
 ```
-Error: page.waitForFunction: Test timeout of 30000ms exceeded.
+Error: page.waitForFunction: Test timeout of 15000ms exceeded.
 ```
 
 # Page snapshot
@@ -29,7 +29,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   - contentinfo [ref=e6]:
     - generic [ref=e7]:
       - paragraph [ref=e8]: Vercel Security Checkpoint
-      - paragraph [ref=e9]: iad1::1784478841-luZWjOmPkYMwNkUSKlAWrgtxFe5fMUYm
+      - paragraph [ref=e9]: iad1::1784478775-l6oQCEAhtrQm2ecKxyTLT92eHhJrXUf8
 ```
 
 # Test source
@@ -42,7 +42,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   5   |   await page.goto('/')
   6   |   // Use window helpers to skip the dump/parse flow
 > 7   |   await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 15000 })
-      |              ^ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
+      |              ^ Error: page.waitForFunction: Test timeout of 15000ms exceeded.
   8   |   await page.evaluate((texts: string[]) => {
   9   |     const tasks = texts.map((text, i) => ({
   10  |       id: String(i + 1),

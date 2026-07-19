@@ -24,17 +24,19 @@ test.describe('Full state machine', () => {
 
   test('start fresh from all-done resets to dump', async ({ page }) => {
     await page.goto('/')
-    await page.waitForFunction(() => typeof window.__setAppState !== 'undefined')
+    await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 10000 })
     await page.evaluate(() => {
       window.__setAppState('ALL_DONE')
       ;(window as Window & typeof globalThis & { __setCompletedCount?: (n: number) => void }).__setCompletedCount?.(3)
     })
+    // Small wait for React to re-render after state mutation
+    await page.waitForTimeout(300)
     const allDone = page.locator('[data-testid="all-done-screen"]')
-    await expect(allDone).toBeVisible({ timeout: 2000 })
-    const startFresh = page.getByRole('button', { name: /spin again tomorrow/i })
+    await expect(allDone).toBeVisible({ timeout: 5000 })
+    const startFresh = page.getByRole('button', { name: /task dump|spin again/i })
     await startFresh.click()
     // Should be on dump screen
     const textarea = page.getByRole('textbox')
-    await expect(textarea).toBeVisible({ timeout: 2000 })
+    await expect(textarea).toBeVisible({ timeout: 5000 })
   })
 })

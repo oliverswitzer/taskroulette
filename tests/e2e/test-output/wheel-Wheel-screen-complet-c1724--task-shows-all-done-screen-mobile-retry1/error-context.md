@@ -12,24 +12,31 @@
 # Error details
 
 ```
-Test timeout of 30000ms exceeded.
-```
+Error: expect(locator).toBeHidden() failed
+
+Locator:  locator('[data-testid="task-card"]')
+Expected: hidden
+Received: visible
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeHidden" with timeout 5000ms
+  - waiting for locator('[data-testid="task-card"]')
+    14 × locator resolved to <div data-testid="task-card">…</div>
+       - unexpected value "visible"
 
 ```
-Error: page.waitForFunction: Test timeout of 30000ms exceeded.
-```
-
-# Page snapshot
 
 ```yaml
-- generic [ref=e2]:
-  - main [ref=e3]:
-    - paragraph [ref=e4]: Failed to verify your browser
-    - paragraph [ref=e5]: Code 21
-  - contentinfo [ref=e6]:
-    - generic [ref=e7]:
-      - paragraph [ref=e8]: Vercel Security Checkpoint
-      - paragraph [ref=e9]: iad1::1784478841-luZWjOmPkYMwNkUSKlAWrgtxFe5fMUYm
+- button "Back to task dump":
+  - img
+  - text: Dump
+- img
+- paragraph: The wheel chose
+- paragraph: Second task
+- button "Mark task complete"
+- paragraph: Got it? Check it off!
+- button "skip for now →"
 ```
 
 # Test source
@@ -41,8 +48,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   4   | async function goToWheel(page: Page, taskTexts: string[]) {
   5   |   await page.goto('/')
   6   |   // Use window helpers to skip the dump/parse flow
-> 7   |   await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 15000 })
-      |              ^ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
+  7   |   await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 15000 })
   8   |   await page.evaluate((texts: string[]) => {
   9   |     const tasks = texts.map((text, i) => ({
   10  |       id: String(i + 1),
@@ -122,7 +128,8 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   84  |     await expect(taskCard).toBeVisible({ timeout: 10000 })
   85  |     await page.locator('[data-testid="task-checkbox"]').click()
   86  |     // Wait for first completion animation (800ms) + transition to next task card
-  87  |     await expect(taskCard).toBeHidden({ timeout: 5000 })
+> 87  |     await expect(taskCard).toBeHidden({ timeout: 5000 })
+      |                            ^ Error: expect(locator).toBeHidden() failed
   88  |     // With 1 task remaining, app auto-shows task card (no spin needed)
   89  |     await expect(taskCard).toBeVisible({ timeout: 10000 })
   90  |     await page.locator('[data-testid="task-checkbox"]').click()
@@ -143,4 +150,21 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   105 |     await skipBtn.click()
   106 |     // Auto-spin fires immediately — the wheel spins and lands on a new task card.
   107 |     // We verify by waiting for another task card to appear (the auto-spin completed).
+  108 |     await expect(page.locator('[data-testid="task-card"]')).toBeVisible({ timeout: 15000 })
+  109 |   })
+  110 | 
+  111 |   test('edit modal opens and closes from wheel', async ({ page }) => {
+  112 |     await goToWheel(page, ['Call dentist', 'Buy groceries'])
+  113 |     const editBtn = page.locator('[data-testid="edit-tasks-btn"]')
+  114 |     await editBtn.click()
+  115 |     const modal = page.locator('[data-testid="edit-modal"]')
+  116 |     await expect(modal).toBeVisible()
+  117 |     await page.screenshot({ path: 'tests/e2e/screenshots/edit-modal-mobile.png' })
+  118 |     // Close by clicking Done
+  119 |     const doneBtn = page.getByRole('button', { name: /done/i })
+  120 |     await doneBtn.click()
+  121 |     await expect(modal).not.toBeVisible()
+  122 |   })
+  123 | })
+  124 | 
 ```

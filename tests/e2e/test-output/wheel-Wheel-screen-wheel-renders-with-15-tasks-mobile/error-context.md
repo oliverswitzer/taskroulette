@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: wheel.spec.ts >> Wheel screen >> completing last task shows all-done screen
-- Location: tests/e2e/wheel.spec.ts:77:3
+- Name: wheel.spec.ts >> Wheel screen >> wheel renders with 15 tasks
+- Location: tests/e2e/wheel.spec.ts:35:3
 
 # Error details
 
@@ -29,7 +29,7 @@ Error: page.waitForFunction: Test timeout of 30000ms exceeded.
   - contentinfo [ref=e6]:
     - generic [ref=e7]:
       - paragraph [ref=e8]: Vercel Security Checkpoint
-      - paragraph [ref=e9]: iad1::1784478841-luZWjOmPkYMwNkUSKlAWrgtxFe5fMUYm
+      - paragraph [ref=e9]: iad1::1784478649-4QXlPTilTrcZ3GqcAhwu0B5ZwIlGzFCT
 ```
 
 # Test source
