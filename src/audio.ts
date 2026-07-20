@@ -42,9 +42,16 @@ function _init(): void {
 
 // Bootstrap on the first touch/click — fires well before the spin button,
 // so audioEl.play() has resolved long before the user can tap Spin.
+// Also pre-loads all sample buffers so they're decoded and cached before
+// any gesture needs them (avoids iOS gesture-context timeout on first play).
+function _preloadAllBuffers(): void {
+  _getBuffer('/audio/task-complete.mp3', 'complete').catch(() => {})
+  _getBuffer('/audio/wheel-lands.mp3', 'lands').catch(() => {})
+  _getBuffer('/audio/crowd-applause.mp3', 'crowd').catch(() => {})
+}
 if (typeof document !== 'undefined') {
-  document.addEventListener('touchstart', () => { _init() }, { once: true, passive: true })
-  document.addEventListener('click', () => { _init() }, { once: true })
+  document.addEventListener('touchstart', () => { _init(); _preloadAllBuffers() }, { once: true, passive: true })
+  document.addEventListener('click', () => { _init(); _preloadAllBuffers() }, { once: true })
 }
 
 // Call synchronously inside the spin button click handler (user gesture).
@@ -73,50 +80,20 @@ export function suspendAudioContext(): void {
   }
 }
 
-// Celebratory "ding" — two sine tones an octave apart, xylophone-style.
-// Called on task checkbox completion. Resumes the audio context for the
-// gesture duration, plays the ding, then suspends again after decay.
+// Task completion sound — called from the checkbox handler (gesture context).
+// Uses the same fetch+decode pattern as all other sample-based sounds.
 export function playCompletionDing(): void {
   _init()
   if (!audioCtx) return
-
-  // Resume inside the user gesture tick so iOS allows playback
   audioCtx.resume().catch(() => {})
-  if (audioEl) {
-    audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  }
-
-  const t = audioCtx.currentTime
-  const dest = getDestination()
-
-  // Two harmonically related tones: root + octave
-  const freqs = [880, 1760]
-  for (const freq of freqs) {
-    const osc = audioCtx.createOscillator()
-    osc.type = 'sine'
-    osc.frequency.value = freq
-
-    const gain = audioCtx.createGain()
-    gain.gain.setValueAtTime(0, t)
-    gain.gain.linearRampToValueAtTime(0.28, t + 0.008)  // fast attack
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6) // natural decay
-
-    osc.connect(gain)
-    gain.connect(dest)
-    osc.start(t)
-    osc.stop(t + 0.62)
-  }
-
-  // Suspend context after the ding has fully decayed
-  setTimeout(() => {
-    if (audioCtx && audioCtx.state === 'running') {
-      audioCtx.suspend().catch(() => {})
-    }
-    if (audioEl && !audioEl.paused) {
-      audioEl.pause()
-      audioElReady = false
-    }
-  }, 700)
+  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
+  _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
+    if (buf) _playBuffer(buf, 1.0)
+    setTimeout(() => {
+      if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
+      if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
+    }, 2500)
+  })
 }
 
 // ── Sample-based sounds (fetched from public/audio/, cached as AudioBuffer) ──
