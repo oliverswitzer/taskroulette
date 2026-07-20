@@ -16,6 +16,20 @@
 
 **Do not tell the user a feature is done until step 6 is confirmed. No exceptions.**
 
+After every `git push` to main, run this poll loop before saying ANYTHING to the user:
+```bash
+RUN_ID=$(gh run list --branch main --limit 1 --json databaseId --jq '.[0].databaseId')
+while true; do
+  RESULT=$(gh run view $RUN_ID --json status,conclusion)
+  STATUS=$(echo $RESULT | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+  CONCLUSION=$(echo $RESULT | python3 -c "import sys,json; print(json.load(sys.stdin)['conclusion'])")
+  echo "$(date '+%H:%M:%S') $STATUS/$CONCLUSION"
+  [ "$STATUS" = "completed" ] && break
+  sleep 15
+done
+```
+Then verify prod: `curl -s -o /dev/null -w "%{http_code}" -u "adhd:founderbuilds" https://taskroulette.vercel.app`
+
 ---
 
 ## MANDATORY: Run `npm run check` before every commit
