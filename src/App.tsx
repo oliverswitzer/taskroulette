@@ -470,6 +470,27 @@ function App() {
           onDismiss={() => setShowEmailModal(false)}
         />
       )}
+      {/* Dev-only reset button — clears localStorage + reloads */}
+      {import.meta.env.DEV && (
+        <div style={{ position: 'fixed', top: 8, left: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => { localStorage.clear(); window.location.reload() }}
+            style={{
+              background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.3)',
+              color: '#f88', borderRadius: 6, padding: '4px 8px',
+              fontSize: 11, fontFamily: 'monospace', cursor: 'pointer',
+            }}
+          >
+            reset
+          </button>
+          {localStorage.getItem('trEmail') && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#0f0', background: 'rgba(0,255,0,0.1)', borderRadius: 6, padding: '4px 8px', border: '1px solid rgba(0,255,0,0.2)' }}>
+              {localStorage.getItem('trEmail')}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }
