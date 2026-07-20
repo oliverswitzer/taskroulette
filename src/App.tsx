@@ -32,13 +32,21 @@ declare global {
   }
 }
 
-// Page transition variants
+// Page transition variants (used by all screens except task card)
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -8 },
 }
 const pageTransition = { duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }
+
+// Task card slides up from the bottom — no page-swap flash
+const taskCardVariants = {
+  initial: { y: '100%' },
+  animate: { y: 0 },
+  exit: { y: '100%' },
+}
+const taskCardTransition = { type: 'spring' as const, stiffness: 380, damping: 42 }
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -310,8 +318,8 @@ function App() {
         justifyContent: 'center',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <AnimatePresence mode="wait">
+      <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: '100dvh' }}>
+      <AnimatePresence>
         {appState === 'DUMP' && (
           <motion.div
             key="dump"
@@ -320,6 +328,7 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
+            style={{ position: 'absolute', width: '100%' }}
           >
             <DumpScreen onSubmit={handleDumpSubmit} error={parseError} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
           </motion.div>
@@ -333,6 +342,7 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
+            style={{ position: 'absolute', width: '100%' }}
           >
             <ParsingScreen />
           </motion.div>
@@ -346,6 +356,7 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
+            style={{ position: 'absolute', width: '100%' }}
           >
             <ListEditScreen
               tasks={tasks}
@@ -366,6 +377,7 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
+            style={{ position: 'absolute', width: '100%' }}
           >
             <WheelScreen
               tasks={activeTasks}
@@ -390,11 +402,12 @@ function App() {
         {appState === 'TASK_CARD' && (
           <motion.div
             key={`task-card-${selectedTask?.id ?? 'none'}`}
-            variants={pageVariants}
+            variants={taskCardVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={pageTransition}
+            transition={taskCardTransition}
+            style={{ position: 'absolute', width: '100%', bottom: 0, top: 0, overflow: 'hidden' }}
           >
             {selectedTask && (
               <TaskCard
@@ -418,6 +431,7 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
+            style={{ position: 'absolute', width: '100%' }}
           >
             <AllDoneScreen
               completedCount={completedCount}
