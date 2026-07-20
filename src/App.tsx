@@ -369,7 +369,7 @@ function App() {
           </motion.div>
         )}
 
-        {(appState === 'WHEEL_IDLE' || appState === 'WHEEL_SPINNING') && (
+        {(appState === 'WHEEL_IDLE' || appState === 'WHEEL_SPINNING' || appState === 'TASK_CARD') && (
           <motion.div
             key="wheel"
             variants={pageVariants}
@@ -386,6 +386,9 @@ function App() {
               onEditTasks={handleOpenEdit}
               onBackToDump={handleBackToDump}
               autoSpinSignal={autoSpinSignal}
+              frozen={appState === 'TASK_CARD'}
+              frozenAngle={wheelAngle}
+              frozenWinnerIndex={selectedIndex}
             />
             <EditModal
               isOpen={isEditModalOpen}
@@ -407,7 +410,12 @@ function App() {
             animate="animate"
             exit="exit"
             transition={taskCardTransition}
-            style={{ position: 'absolute', width: '100%', bottom: 0, top: 0, overflow: 'hidden' }}
+            style={{ 
+              position: 'absolute', 
+              width: '100%', 
+              bottom: 0,
+              zIndex: 10,
+            }}
           >
             {selectedTask && (
               <TaskCard
@@ -415,9 +423,6 @@ function App() {
                 onComplete={handleTaskComplete}
                 onSkip={handleSkip}
                 onBackToDump={handleBackToDump}
-                wheelAngle={wheelAngle}
-                winningIndex={selectedIndex}
-                activeTasks={activeTasks}
               />
             )}
           </motion.div>
