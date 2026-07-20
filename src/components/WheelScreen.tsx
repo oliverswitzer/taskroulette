@@ -95,13 +95,17 @@ export default function WheelScreen({
   // Transition to TASK_CARD when spin completes (after 600ms glow hold).
   // Also suspends the AudioContext so the idle MediaStream stops emitting.
   const spinTransitionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasPlayedLandsRef = useRef(false)
   useEffect(() => {
     if (physics.winningSliceIndex !== null && !isSpinning) {
       const winnerIndex = physics.winningSliceIndex
       const finalAngle = finalAngleRef.current
 
-      suspendAudioContext()
-      playWheelLands()
+      if (!hasPlayedLandsRef.current) {
+        hasPlayedLandsRef.current = true
+        suspendAudioContext()
+        playWheelLands()
+      }
 
       spinTransitionRef.current = setTimeout(() => {
         if (tasks[winnerIndex]) {
@@ -120,6 +124,7 @@ export default function WheelScreen({
 
       // resumeAudioContext() handles init + resume in the same gesture tick.
       resumeAudioContext()
+      hasPlayedLandsRef.current = false
 
       lastAngleRef.current = physics.angle
       onSpinStart?.()
