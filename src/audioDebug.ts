@@ -2,11 +2,10 @@
 // audio.ts pushes events here; the overlay reads them reactively.
 
 export type AudioEvent = {
-  t: number        // performance.now() ms
+  t: number
   label: string
 }
 
-// Ring buffer — keep last 60 events
 const MAX_EVENTS = 60
 export const audioEvents: AudioEvent[] = []
 let _listeners: Array<() => void> = []
@@ -22,14 +21,13 @@ export function onAudioEvent(fn: () => void): () => void {
   return () => { _listeners = _listeners.filter(f => f !== fn) }
 }
 
-// Exposed so AudioDebugOverlay can read analyser + live state
-export let analyser: AnalyserNode | null = null
-export function setAnalyser(a: AnalyserNode) { analyser = a }
+// analyser stub — kept so AudioDebugOverlay import doesn't break
+export const analyser: AnalyserNode | null = null
 
 export const liveState = {
   ctxState: 'none' as string,
-  audioElReady: false,
-  audioElPaused: true,
+  audioElReady: true,   // always true — no <audio> element
+  audioElPaused: false, // always false — no <audio> element
   tickCount: 0,
   activeNodes: 0,
 }
