@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { Task } from '../types'
+import { playCompletionDing } from '../audio'
 
 interface TaskCardProps {
   task: Task
@@ -33,6 +34,7 @@ export default function TaskCard({
   const handleCheck = useCallback(() => {
     if (checked || completing) return
     setChecked(true)
+    playCompletionDing()
     fireConfetti()
     setCompleting(true)
     setTimeout(() => {

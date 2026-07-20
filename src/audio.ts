@@ -73,6 +73,52 @@ export function suspendAudioContext(): void {
   }
 }
 
+// Celebratory "ding" — two sine tones an octave apart, xylophone-style.
+// Called on task checkbox completion. Resumes the audio context for the
+// gesture duration, plays the ding, then suspends again after decay.
+export function playCompletionDing(): void {
+  _init()
+  if (!audioCtx) return
+
+  // Resume inside the user gesture tick so iOS allows playback
+  audioCtx.resume().catch(() => {})
+  if (audioEl) {
+    audioEl.play().then(() => { audioElReady = true }).catch(() => {})
+  }
+
+  const t = audioCtx.currentTime
+  const dest = getDestination()
+
+  // Two harmonically related tones: root + octave
+  const freqs = [880, 1760]
+  for (const freq of freqs) {
+    const osc = audioCtx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+
+    const gain = audioCtx.createGain()
+    gain.gain.setValueAtTime(0, t)
+    gain.gain.linearRampToValueAtTime(0.28, t + 0.008)  // fast attack
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6) // natural decay
+
+    osc.connect(gain)
+    gain.connect(dest)
+    osc.start(t)
+    osc.stop(t + 0.62)
+  }
+
+  // Suspend context after the ding has fully decayed
+  setTimeout(() => {
+    if (audioCtx && audioCtx.state === 'running') {
+      audioCtx.suspend().catch(() => {})
+    }
+    if (audioEl && !audioEl.paused) {
+      audioEl.pause()
+      audioElReady = false
+    }
+  }, 700)
+}
+
 export function playTick(velocity: number): void {
   if (!audioCtx || !audioElReady) return
   if (audioCtx.state !== 'running') return
