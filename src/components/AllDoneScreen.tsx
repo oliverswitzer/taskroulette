@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { MOTIVATIONAL_MESSAGES } from '../constants'
 import { playCrowdApplause } from '../audio'
+import { recordSessionComplete } from '../api'
+import EmailGateModal, { TR_EMAIL_KEY } from './EmailGateModal'
 
 interface AllDoneScreenProps {
   completedCount: number
@@ -13,7 +15,6 @@ export default function AllDoneScreen({
   completedCount,
   onStartFresh,
 }: AllDoneScreenProps) {
-  // Pick a random message once
   const [message] = useState(() => {
     const template = MOTIVATIONAL_MESSAGES[
       Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)
@@ -21,8 +22,14 @@ export default function AllDoneScreen({
     return template.replace(/\{n\}/g, String(completedCount))
   })
 
-  // Fire confetti + crowd applause on mount
+  // Show email modal after applause settles (~10s) — unless already submitted
+  const [showModal, setShowModal] = useState(false)
+
   useEffect(() => {
+    // Record session complete — fire and forget
+    recordSessionComplete()
+
+    // Fire confetti + applause
     playCrowdApplause()
     confetti({
       particleCount: 220,
@@ -38,7 +45,18 @@ export default function AllDoneScreen({
     const timer2 = setTimeout(() => {
       confetti({ particleCount: 80, spread: 120, origin: { x: 0.5, y: 0.3 }, gravity: 0.5 })
     }, 700)
-    return () => { clearTimeout(timer1); clearTimeout(timer2) }
+
+    // Show email gate after applause ends — only if no email in localStorage
+    const hasEmail = !!localStorage.getItem(TR_EMAIL_KEY)
+    const modalTimer = !hasEmail
+      ? setTimeout(() => setShowModal(true), 10000)
+      : undefined
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      if (modalTimer) clearTimeout(modalTimer)
+    }
   }, [])
 
   return (
@@ -125,9 +143,17 @@ export default function AllDoneScreen({
             cursor: 'pointer',
           }}
         >
-          Task dump & spin again →
+          Task dump &amp; spin again →
         </button>
       </motion.div>
+
+      {/* Email gate modal — slides up after applause, if not already subscribed */}
+      {showModal && (
+        <EmailGateModal
+          onSuccess={() => setShowModal(false)}
+          onDismiss={() => setShowModal(false)}
+        />
+      )}
     </div>
   )
 }

@@ -9,7 +9,8 @@ import WheelScreen from './components/WheelScreen'
 import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
-import { parseTasks, parseTasksFromImage } from './api'
+import { parseTasks, parseTasksFromImage, getSessionStatus } from './api'
+import EmailGateModal, { TR_EMAIL_KEY } from './components/EmailGateModal'
 import {
   saveTasks,
   loadTasks,
@@ -60,6 +61,8 @@ function fileToBase64(file: File): Promise<string> {
 function App() {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
   const [completedCount, setCompletedCount] = useState<number>(() => loadCompletedCount())
+  const [sessionLimitMsg, setSessionLimitMsg] = useState<string | null>(null)
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   // Restore TASK_CARD state: check if there's a persisted selected task
   const [appState, setAppState] = useState<AppState>(() => {
@@ -120,6 +123,19 @@ function App() {
   // ── DUMP → PARSING ──────────────────────────────────────────────────────────
   const handleDumpSubmit = async (dump: string, photo?: File) => {
     setParseError(undefined)
+    setSessionLimitMsg(null)
+
+    // Check session limit before spending API call / showing loading state
+    const status = await getSessionStatus()
+    if (!status.allowed) {
+      if (status.reason === 'come_back_tomorrow') {
+        setSessionLimitMsg("You've hit your limit of 3 sessions today. Come back tomorrow 💪")
+      } else if (status.reason === 'needs_email') {
+        setShowEmailModal(true)
+      }
+      return
+    }
+
     setAppState('PARSING')
     try {
       let parsed: string[]
@@ -330,7 +346,7 @@ function App() {
             transition={pageTransition}
             style={{ position: 'absolute', width: '100%' }}
           >
-            <DumpScreen onSubmit={handleDumpSubmit} error={parseError} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
+            <DumpScreen onSubmit={handleDumpSubmit} error={parseError ?? sessionLimitMsg ?? undefined} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
           </motion.div>
         )}
 
@@ -446,6 +462,13 @@ function App() {
         )}
       </AnimatePresence>
       </div>
+      {/* Email gate modal — shown when session limit hit and no email yet */}
+      {showEmailModal && (
+        <EmailGateModal
+          onSuccess={() => setShowEmailModal(false)}
+          onDismiss={() => setShowEmailModal(false)}
+        />
+      )}
     </div>
   )
 }
