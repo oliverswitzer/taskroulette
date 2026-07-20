@@ -4,11 +4,18 @@
 // iOS routing: Web Audio's audioCtx.destination routes to the RINGER channel
 // (silenced by mute switch). We pipe through MediaStreamAudioDestinationNode →
 // <audio> element to use the MEDIA channel instead (volume buttons, not mute).
+//
+// KEY INVARIANT: audioEl is NEVER paused after first play. The browser buffers
+// MediaStream audio on pause and replays it on the next play() call — producing
+// ghost echoes of tick sounds. AudioContext suspend/resume is sufficient to
+// silence the stream; the <audio> element just hears zeros from a suspended
+// context and stays quiet.
+
+import { logAudioEvent, setAnalyser, liveState } from './audioDebug'
 
 let audioCtx: AudioContext | null = null
 let mediaStreamDest: MediaStreamAudioDestinationNode | null = null
 let audioEl: HTMLAudioElement | null = null
-let audioElReady = false
 let lastTickTime = 0
 const MIN_TICK_INTERVAL_MS = 18
 
@@ -16,12 +23,19 @@ const MIN_TICK_INTERVAL_MS = 18
 // Prevents an older sound's suspend from killing a newer sound mid-play.
 let _suspendTimer: ReturnType<typeof setTimeout> | null = null
 
+function _syncLiveState() {
+  liveState.ctxState = audioCtx?.state ?? 'none'
+  liveState.audioElPaused = audioEl?.paused ?? true
+}
+
 function _scheduleSuspend(delayMs: number): void {
   if (_suspendTimer !== null) clearTimeout(_suspendTimer)
   _suspendTimer = setTimeout(() => {
     _suspendTimer = null
+    logAudioEvent(`_scheduleSuspend fired after ${delayMs}ms → ctx.suspend() only`)
+    // Suspend context only — never pause audioEl (see invariant at top)
     if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
-    if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
+    _syncLiveState()
   }, delayMs)
 }
 
@@ -30,156 +44,182 @@ function getDestination(): AudioNode {
   return audioCtx!.destination
 }
 
+let _initDone = false
 function _init(): void {
-  if (audioCtx) return
+  if (_initDone) return
+  _initDone = true
   audioCtx = new AudioContext()
+  logAudioEvent(`_init: ctx created, sampleRate=${audioCtx.sampleRate}`)
 
   try {
     mediaStreamDest = audioCtx.createMediaStreamDestination()
+
+    // Tap an AnalyserNode as a silent monitor on the graph
+    const analyserNode = audioCtx.createAnalyser()
+    analyserNode.fftSize = 1024
+    analyserNode.connect(audioCtx.destination) // silent — just for waveform metering
+    setAnalyser(analyserNode)
+
     audioEl = new Audio()
     audioEl.srcObject = mediaStreamDest.stream
+    // Play once and NEVER pause — pausing buffers MediaStream audio and
+    // replays it on the next play(), producing ghost tick echoes.
     audioEl.play()
-      .then(() => { audioElReady = true })
-      .catch(() => {})
-  } catch {
-    // MediaStreamAudioDestinationNode not supported — fall back to default destination
+      .then(() => {
+        logAudioEvent('audioEl.play() resolved — will not pause again')
+        _syncLiveState()
+      })
+      .catch(e => logAudioEvent(`audioEl.play() rejected: ${e}`))
+  } catch (e) {
+    logAudioEvent(`MediaStreamDest failed: ${e} — fallback to ctx.destination`)
     mediaStreamDest = null
     audioEl = null
-    audioElReady = true
   }
 
-  // Start suspended — only resume when actually spinning. Keeps the MediaStream
-  // idle between spins so it doesn't emit buffer-click artifacts at rest.
+  // Start suspended — resume only when spinning
   audioCtx.suspend().catch(() => {})
+  logAudioEvent('_init: ctx suspended')
+  _syncLiveState()
 }
 
-// Bootstrap on the first touch/click — fires well before the spin button,
-// so audioEl.play() has resolved long before the user can tap Spin.
-// Also pre-loads all sample buffers so they're decoded and cached before
-// any gesture needs them (avoids iOS gesture-context timeout on first play).
+// Prevent duplicate concurrent fetches for the same key
+const _pendingFetches: Map<string, Promise<AudioBuffer | null>> = new Map()
+const _decodedBuffers: Map<string, AudioBuffer> = new Map()
+
+// Bootstrap on first gesture — guarded so touchstart + click both firing
+// on the same tap only runs init + preload once.
+let _bootstrapped = false
+function _bootstrap() {
+  if (_bootstrapped) return
+  _bootstrapped = true
+  logAudioEvent('bootstrap: _init + preload')
+  _init()
+  _preloadAllBuffers()
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', _bootstrap, { once: true, passive: true })
+  document.addEventListener('click', _bootstrap, { once: true })
+}
+
 function _preloadAllBuffers(): void {
   _getBuffer('/audio/task-complete.mp3', 'complete').catch(() => {})
   _getBuffer('/audio/wheel-lands.mp3', 'lands').catch(() => {})
   _getBuffer('/audio/crowd-applause.mp3', 'crowd').catch(() => {})
 }
-if (typeof document !== 'undefined') {
-  document.addEventListener('touchstart', () => { _init(); _preloadAllBuffers() }, { once: true, passive: true })
-  document.addEventListener('click', () => { _init(); _preloadAllBuffers() }, { once: true })
-}
 
 // Call synchronously inside the spin button click handler (user gesture).
-// Resumes the suspended context + re-kicks audioEl.play() if needed.
+// Resumes the suspended context. audioEl.play() only called if iOS backgrounded it.
 export function resumeAudioContext(): void {
+  logAudioEvent(`resumeAudioContext (ctx=${audioCtx?.state ?? 'null'}, elPaused=${audioEl?.paused})`)
   _init()
   if (audioCtx && audioCtx.state === 'suspended') {
     audioCtx.resume().catch(() => {})
   }
-  if (audioEl) {
-    audioEl.play()
-      .then(() => { audioElReady = true })
-      .catch(() => {})
+  // Only re-kick audioEl if iOS backgrounded/suspended it
+  if (audioEl && audioEl.paused) {
+    logAudioEvent('resumeAudioContext: re-kicking audioEl (was paused by iOS)')
+    audioEl.play().catch(e => logAudioEvent(`resumeAudioContext: audioEl.play() rejected: ${e}`))
   }
+  _syncLiveState()
 }
 
-// Call when the spin ends — suspends the context AND pauses the audio element
-// so iOS has no active audio session between spins (prevents silence-frame DAC artifacts).
+// Call when the spin ends — suspends AudioContext ONLY.
+// audioEl is intentionally NOT paused — see invariant at top of file.
 export function suspendAudioContext(): void {
-  // Cancel any pending auto-suspend from a previous sound
+  logAudioEvent(`suspendAudioContext called (ctx=${audioCtx?.state ?? 'null'}) — ctx only, audioEl stays playing`)
   if (_suspendTimer !== null) { clearTimeout(_suspendTimer); _suspendTimer = null }
   if (audioCtx && audioCtx.state === 'running') {
     audioCtx.suspend().catch(() => {})
   }
-  if (audioEl && !audioEl.paused) {
-    audioEl.pause()
-    audioElReady = false
-  }
+  // NOT pausing audioEl — it just reads silence from the suspended context
+  _syncLiveState()
 }
-
-// Task completion sound — called from the checkbox handler (gesture context).
-// Uses the same fetch+decode pattern as all other sample-based sounds.
-export function playCompletionDing(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 2.5s — clip is 2s, give 500ms headroom; cancels any older suspend timer
-    _scheduleSuspend(2500)
-  })
-}
-
-// ── Sample-based sounds (fetched from public/audio/, cached as AudioBuffer) ──
-// Files live in public/audio/ — served as static assets by Vite and cached
-// by the PWA service worker after first load. No bundle bloat.
-
-const _decodedBuffers: Map<string, AudioBuffer> = new Map()
 
 async function _getBuffer(url: string, key: string): Promise<AudioBuffer | null> {
   if (_decodedBuffers.has(key)) return _decodedBuffers.get(key)!
+  // Deduplicate concurrent fetches for the same key
+  if (_pendingFetches.has(key)) return _pendingFetches.get(key)!
   if (!audioCtx) return null
-  try {
-    const res = await fetch(url)
-    const arrayBuf = await res.arrayBuffer()
-    const buf = await audioCtx.decodeAudioData(arrayBuf)
-    _decodedBuffers.set(key, buf)
-    return buf
-  } catch {
-    return null
-  }
+
+  logAudioEvent(`_getBuffer fetch: ${key}`)
+  const promise = (async () => {
+    try {
+      const res = await fetch(url)
+      const arrayBuf = await res.arrayBuffer()
+      const buf = await audioCtx!.decodeAudioData(arrayBuf)
+      _decodedBuffers.set(key, buf)
+      _pendingFetches.delete(key)
+      logAudioEvent(`_getBuffer decoded: ${key} (${buf.duration.toFixed(2)}s)`)
+      return buf
+    } catch (e) {
+      _pendingFetches.delete(key)
+      logAudioEvent(`_getBuffer error ${key}: ${e}`)
+      return null
+    }
+  })()
+
+  _pendingFetches.set(key, promise)
+  return promise
 }
 
 function _playBuffer(buf: AudioBuffer, volume = 1.0): void {
   if (!audioCtx) return
+  liveState.activeNodes++
   const src = audioCtx.createBufferSource()
   src.buffer = buf
   const gainNode = audioCtx.createGain()
   gainNode.gain.value = volume
   src.connect(gainNode)
   gainNode.connect(getDestination())
-  // Disconnect nodes when playback finishes — prevents orphaned nodes from
-  // accumulating in the audio graph and emitting silence-frame artifacts on iOS.
   src.onended = () => {
+    liveState.activeNodes--
     src.disconnect()
     gainNode.disconnect()
   }
   src.start(audioCtx.currentTime)
 }
 
-// Play when wheel lands on a task (called just before TASK_CARD transition).
-// Resumes context inside the same gesture chain as the spin.
-export function playWheelLands(): void {
+export function playCompletionDing(): void {
+  logAudioEvent('playCompletionDing called')
   _init()
   if (!audioCtx) return
   audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/wheel-lands.mp3', 'lands').then(buf => {
-    if (buf) _playBuffer(buf, 0.85)
-    // 2.5s — clip is 2s; cancels any older suspend timer
+  _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
+    if (buf) { logAudioEvent('playCompletionDing: _playBuffer'); _playBuffer(buf, 1.0) }
     _scheduleSuspend(2500)
   })
 }
 
-// Play crowd applause when all tasks are done (AllDoneScreen mount).
-export function playCrowdApplause(): void {
+export function playWheelLands(): void {
+  logAudioEvent('playWheelLands called')
   _init()
   if (!audioCtx) return
   audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
+  _getBuffer('/audio/wheel-lands.mp3', 'lands').then(buf => {
+    if (buf) { logAudioEvent('playWheelLands: _playBuffer'); _playBuffer(buf, 0.85) }
+    _scheduleSuspend(2500)
+  })
+}
+
+export function playCrowdApplause(): void {
+  logAudioEvent('playCrowdApplause called')
+  _init()
+  if (!audioCtx) return
+  audioCtx.resume().catch(() => {})
   _getBuffer('/audio/crowd-applause.mp3', 'crowd').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 11s — clip is 10s; cancels any older suspend timer
+    if (buf) { logAudioEvent('playCrowdApplause: _playBuffer'); _playBuffer(buf, 1.0) }
     _scheduleSuspend(11000)
   })
 }
 
 export function playTick(velocity: number): void {
-  if (!audioCtx || !audioElReady) return
+  if (!audioCtx) return
   if (audioCtx.state !== 'running') return
 
   const now = audioCtx.currentTime * 1000
   if (now - lastTickTime < MIN_TICK_INTERVAL_MS) return
   lastTickTime = now
+  liveState.tickCount++
 
   const t = audioCtx.currentTime
   const dest = getDestination()
@@ -203,6 +243,11 @@ export function playTick(velocity: number): void {
   clickSource.connect(clickFilter)
   clickFilter.connect(clickGain)
   clickGain.connect(dest)
+  clickSource.onended = () => {
+    clickSource.disconnect()
+    clickFilter.disconnect()
+    clickGain.disconnect()
+  }
   clickSource.start(t)
 
   // Layer 2: Resonant body (triangle oscillator)
@@ -215,6 +260,10 @@ export function playTick(velocity: number): void {
   bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
   osc.connect(bodyGain)
   bodyGain.connect(dest)
+  osc.onended = () => {
+    osc.disconnect()
+    bodyGain.disconnect()
+  }
   osc.start(t)
   osc.stop(t + 0.09)
 }

@@ -22,6 +22,9 @@ import {
   clearAll,
 } from './storage'
 import { MAX_TASKS } from './constants'
+import AudioDebugOverlay from './components/AudioDebugOverlay'
+
+const AUDIO_DEBUG = import.meta.env.VITE_AUDIO_DEBUG === 'true'
 
 // Expose state setters for Playwright testing
 declare global {
@@ -446,6 +449,7 @@ function App() {
         )}
       </AnimatePresence>
       </div>
+      {AUDIO_DEBUG && <AudioDebugOverlay />}
     </div>
   )
 }
