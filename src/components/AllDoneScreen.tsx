@@ -46,11 +46,9 @@ export default function AllDoneScreen({
       confetti({ particleCount: 80, spread: 120, origin: { x: 0.5, y: 0.3 }, gravity: 0.5 })
     }, 700)
 
-    // Show email gate after applause ends — only if no email in localStorage
+    // Show email gate after confetti settles — short delay so confetti fires first
     const hasEmail = !!localStorage.getItem(TR_EMAIL_KEY)
-    const modalTimer = !hasEmail
-      ? setTimeout(() => setShowModal(true), 10000)
-      : undefined
+    const modalTimer = !hasEmail ? setTimeout(() => setShowModal(true), 3000) : undefined
 
     return () => {
       clearTimeout(timer1)
