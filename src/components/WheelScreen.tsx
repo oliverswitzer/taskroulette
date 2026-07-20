@@ -160,16 +160,22 @@ export default function WheelScreen({
     <div
       data-testid="wheel-screen"
       style={{
-        minHeight: '100dvh',
+        // In frozen mode: size to fit above the task card bottom sheet.
+        // 100svh = stable small viewport (excludes Safari address bar) so
+        // the wheel stays fully visible regardless of URL bar state.
+        // ~300px is the estimated task card height on mobile.
+        height: frozen ? 'calc(100svh - 300px)' : undefined,
+        minHeight: frozen ? undefined : '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: frozen ? 'center' : 'flex-start',
         padding: '0 20px',
-        paddingBottom: 32,
-        paddingTop: frozen ? 80 : 0,
+        paddingBottom: frozen ? 0 : 32,
+        paddingTop: frozen ? 0 : 0,
         boxSizing: 'border-box',
         position: 'relative',
-        overflow: 'hidden',
+        overflow: frozen ? 'visible' : 'hidden',
       }}
     >
       {/* Top bar */}
