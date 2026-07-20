@@ -3,6 +3,21 @@
 > Read this file before making any changes to this repo.
 > For full architecture, decisions, and gotchas → `docs/adrs/ADR-001-implementation-overview.md`
 
+---
+
+## ⛔ DEFINITION OF DONE — NEVER declare a feature complete without ALL of these:
+
+1. `npm run typecheck` — zero errors
+2. `npm run lint` — zero warnings, zero errors
+3. `npm run test` — all unit/component tests pass
+4. `npx playwright test --project=mobile` — all 23 E2E tests pass **locally**
+5. Push to main → watch CI at https://github.com/oliverswitzer/taskroulette/actions → confirm **green**
+6. CI green = Vercel deploy fired → confirm prod URL responds at https://taskroulette.vercel.app
+
+**Do not tell the user a feature is done until step 6 is confirmed. No exceptions.**
+
+---
+
 ## MANDATORY: Run `npm run check` before every commit
 
 ```bash
