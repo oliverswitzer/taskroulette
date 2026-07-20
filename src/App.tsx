@@ -126,14 +126,17 @@ function App() {
     setSessionLimitMsg(null)
 
     // Check session limit before spending API call / showing loading state
-    const status = await getSessionStatus()
-    if (!status.allowed) {
-      if (status.reason === 'come_back_tomorrow') {
-        setSessionLimitMsg("You've hit your limit of 3 sessions today. Come back tomorrow 💪")
-      } else if (status.reason === 'needs_email') {
-        setShowEmailModal(true)
+    // Skip in test/dev environments to avoid blocking E2E tests
+    if (!import.meta.env.VITE_SKIP_SESSION_LIMIT) {
+      const status = await getSessionStatus()
+      if (!status.allowed) {
+        if (status.reason === 'come_back_tomorrow') {
+          setSessionLimitMsg("You've hit your limit of 3 sessions today. Come back tomorrow 💪")
+        } else if (status.reason === 'needs_email') {
+          setShowEmailModal(true)
+        }
+        return
       }
-      return
     }
 
     setAppState('PARSING')

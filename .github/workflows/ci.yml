@@ -38,6 +38,7 @@ jobs:
         run: npx playwright test --project=mobile
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VITE_SKIP_SESSION_LIMIT: true
 
       # Deploy to Vercel only on push to main, only if all tests passed
       - name: Deploy to Vercel
