@@ -9,7 +9,7 @@ import WheelScreen from './components/WheelScreen'
 import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
-import { parseTasks, parseTasksFromImage, getSessionStatus } from './api'
+import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
 import EmailGateModal, { TR_EMAIL_KEY } from './components/EmailGateModal'
 import {
   saveTasks,
@@ -268,6 +268,7 @@ function App() {
         ticks: 200,
       })
 
+      recordSessionComplete()
       setAppState('ALL_DONE')
     } else if (remaining.length === 1) {
       // Go directly to TASK_CARD for the last task — skipping WHEEL_IDLE avoids

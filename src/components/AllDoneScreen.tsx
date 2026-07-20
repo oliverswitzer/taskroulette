@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { MOTIVATIONAL_MESSAGES } from '../constants'
 import { playCrowdApplause } from '../audio'
-import { recordSessionComplete } from '../api'
 import EmailGateModal, { TR_EMAIL_KEY } from './EmailGateModal'
 
 interface AllDoneScreenProps {
@@ -26,9 +25,6 @@ export default function AllDoneScreen({
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
-    // Record session complete — fire and forget
-    recordSessionComplete()
-
     // Fire confetti + applause
     playCrowdApplause()
     confetti({
