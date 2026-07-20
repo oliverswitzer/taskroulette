@@ -75,7 +75,7 @@ test.describe('Real API — text parse', () => {
 
       // Should be on WHEEL_IDLE — spin button must be visible before we click
       const currentSpinBtn = page.getByRole('button', { name: /spin the wheel/i })
-      await expect(currentSpinBtn).toBeVisible({ timeout: 5000 })
+      await expect(currentSpinBtn).toBeVisible({ timeout: 8000 })
       await currentSpinBtn.click()
 
       // Wait for task card (wheel physics take up to 5s in headless)

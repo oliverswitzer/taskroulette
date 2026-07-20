@@ -80,13 +80,17 @@ test.describe('Wheel screen', () => {
     await goToWheel(page, ['Only task', 'Second task'])
     // Spin and complete first task
     await page.getByRole('button', { name: /spin/i }).click()
-    const taskCard = page.locator('[data-testid="task-card"]')
+    // Use .first() — during AnimatePresence exit two task-card divs can coexist briefly
+    const taskCard = page.locator('[data-testid="task-card"]').first()
     await expect(taskCard).toBeVisible({ timeout: 10000 })
-    const checkbox = page.locator('[data-testid="task-checkbox"]')
+    const checkbox = page.locator('[data-testid="task-checkbox"]').first()
+    // Capture whatever task the wheel picked first — could be either task
+    const firstText = await taskCard.innerText()
     await checkbox.click()
-    // After completing task 1, app auto-selects task 2 (card stays visible, content changes)
-    // Wait for the task text to update AND the checkbox to be re-enabled before clicking
-    await expect(page.locator('[data-testid="task-card"]')).toContainText('Second task', { timeout: 10000 })
+    // After completing task 1, app auto-selects the remaining task.
+    // Card stays mounted but its content changes — wait for that change.
+    await expect.poll(async () => await taskCard.innerText(), { timeout: 10000 }).not.toBe(firstText)
+    // Ensure checkbox is interactive before clicking
     await expect(checkbox).toBeEnabled({ timeout: 5000 })
     await checkbox.click()
     // All done screen — fires after 0 remaining + confetti burst (~800ms total)

@@ -1,18 +1,13 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { Task } from '../types'
-import WheelCanvas from './WheelCanvas'
 
 interface TaskCardProps {
   task: Task
   onComplete: () => void
   onSkip: () => void
   onBackToDump: () => void
-  wheelAngle: number
-  winningIndex: number | null
-  activeTasks: Task[]
-  wheelSize?: number
 }
 
 function fireConfetti() {
@@ -31,24 +26,9 @@ export default function TaskCard({
   onComplete,
   onSkip,
   onBackToDump,
-  wheelAngle,
-  winningIndex,
-  activeTasks,
-  wheelSize: wheelSizeProp,
 }: TaskCardProps) {
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
-
-  // Match WheelScreen sizing — full width up to 400px
-  const [computedWheelSize, setComputedWheelSize] = useState(() =>
-    wheelSizeProp ?? Math.min(window.innerWidth - 40, 400)
-  )
-  useEffect(() => {
-    if (wheelSizeProp) return
-    const handleResize = () => setComputedWheelSize(Math.min(window.innerWidth - 40, 400))
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [wheelSizeProp])
 
   const handleCheck = useCallback(() => {
     if (checked || completing) return
@@ -64,16 +44,19 @@ export default function TaskCard({
     <div
       data-testid="task-card"
       style={{
-        minHeight: '100dvh',
+        height: 'auto',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         padding: '0 20px 40px',
+        paddingTop: 24,
         boxSizing: 'border-box',
+        borderRadius: '24px 24px 0 0',
+        background: 'var(--color-base)',
       }}
     >
       {/* Back button — top left */}
-      <div style={{ width: '100%', maxWidth: computedWheelSize, padding: '12px 0 0' }}>
+      <div style={{ width: '100%', maxWidth: 400, padding: '0 0 8px' }}>
         <button
           type="button"
           onClick={onBackToDump}
@@ -97,24 +80,6 @@ export default function TaskCard({
           </svg>
           Dump
         </button>
-      </div>
-
-      {/* Frozen wheel with glowing winner */}
-      <div style={{ width: computedWheelSize }}>
-        <div
-          style={{
-            borderRadius: '50%',
-            boxShadow: '0 0 0 3px rgba(240,90,34,0.7), 0 0 50px rgba(240,90,34,0.45), 0 0 90px rgba(240,90,34,0.2)',
-          }}
-        >
-          <WheelCanvas
-            tasks={activeTasks}
-            angle={wheelAngle}
-            winningIndex={winningIndex}
-            size={computedWheelSize}
-            tickerDeflection={0}
-          />
-        </div>
       </div>
 
       {/* Floating task card */}

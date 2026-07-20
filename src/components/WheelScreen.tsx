@@ -14,6 +14,9 @@ interface WheelScreenProps {
   onBackToDump: () => void
   autoSpinRef?: React.MutableRefObject<boolean>
   autoSpinSignal?: number
+  frozen?: boolean
+  frozenAngle?: number
+  frozenWinnerIndex?: number | null
 }
 
 
@@ -25,6 +28,9 @@ export default function WheelScreen({
   onBackToDump,
   autoSpinRef: _autoSpinRef,
   autoSpinSignal = 0,
+  frozen = false,
+  frozenAngle,
+  frozenWinnerIndex,
 }: WheelScreenProps) {
   // Compute wheel size — cap at container width (480px max), not full viewport
   const [wheelSize, setWheelSize] = useState(() =>
@@ -159,6 +165,7 @@ export default function WheelScreen({
         alignItems: 'center',
         padding: '0 20px',
         paddingBottom: 32,
+        paddingTop: frozen ? 80 : 0,
         boxSizing: 'border-box',
         position: 'relative',
         overflow: 'hidden',
@@ -169,7 +176,7 @@ export default function WheelScreen({
         style={{
           width: '100%',
           maxWidth: 400,
-          display: 'flex',
+          display: frozen ? 'none' : 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '20px 0 16px',
@@ -252,7 +259,7 @@ export default function WheelScreen({
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         style={{
           borderRadius: '50%',
-          boxShadow: physics.winningSliceIndex !== null
+          boxShadow: (frozen || physics.winningSliceIndex !== null)
             ? '0 0 0 3px rgba(240,90,34,0.65), 0 0 55px rgba(240,90,34,0.4), 0 0 80px rgba(240,90,34,0.2)'
             : '0 8px 40px rgba(0,0,0,0.5)',
           transition: 'box-shadow 0.4s ease',
@@ -260,8 +267,8 @@ export default function WheelScreen({
       >
         <WheelCanvas
           tasks={tasks}
-          angle={physics.angle}
-          winningIndex={physics.winningSliceIndex}
+          angle={frozen ? (frozenAngle ?? 0) : physics.angle}
+          winningIndex={frozen ? (frozenWinnerIndex ?? null) : physics.winningSliceIndex}
           size={wheelSize}
           tickerDeflection={tickerDeflection}
         />
@@ -273,6 +280,7 @@ export default function WheelScreen({
           marginTop: 24,
           width: '100%',
           maxWidth: 400,
+          display: frozen ? 'none' : undefined,
         }}
       >
         <motion.button
