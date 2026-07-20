@@ -10,7 +10,7 @@ import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
 import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
-import EmailGateModal, { TR_EMAIL_KEY } from './components/EmailGateModal'
+import EmailGateModal from './components/EmailGateModal'
 import {
   saveTasks,
   loadTasks,
