@@ -12,6 +12,19 @@ let audioElReady = false
 let lastTickTime = 0
 const MIN_TICK_INTERVAL_MS = 18
 
+// Shared suspend timer — always cancelled + rescheduled by each new sound.
+// Prevents an older sound's suspend from killing a newer sound mid-play.
+let _suspendTimer: ReturnType<typeof setTimeout> | null = null
+
+function _scheduleSuspend(delayMs: number): void {
+  if (_suspendTimer !== null) clearTimeout(_suspendTimer)
+  _suspendTimer = setTimeout(() => {
+    _suspendTimer = null
+    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
+    if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
+  }, delayMs)
+}
+
 function getDestination(): AudioNode {
   if (mediaStreamDest) return mediaStreamDest
   return audioCtx!.destination
@@ -71,6 +84,8 @@ export function resumeAudioContext(): void {
 // Call when the spin ends — suspends the context AND pauses the audio element
 // so iOS has no active audio session between spins (prevents silence-frame DAC artifacts).
 export function suspendAudioContext(): void {
+  // Cancel any pending auto-suspend from a previous sound
+  if (_suspendTimer !== null) { clearTimeout(_suspendTimer); _suspendTimer = null }
   if (audioCtx && audioCtx.state === 'running') {
     audioCtx.suspend().catch(() => {})
   }
@@ -89,10 +104,8 @@ export function playCompletionDing(): void {
   if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
   _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
     if (buf) _playBuffer(buf, 1.0)
-    setTimeout(() => {
-      if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
-      if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
-    }, 2500)
+    // 2.5s — clip is 2s, give 500ms headroom; cancels any older suspend timer
+    _scheduleSuspend(2500)
   })
 }
 
@@ -124,6 +137,12 @@ function _playBuffer(buf: AudioBuffer, volume = 1.0): void {
   gainNode.gain.value = volume
   src.connect(gainNode)
   gainNode.connect(getDestination())
+  // Disconnect nodes when playback finishes — prevents orphaned nodes from
+  // accumulating in the audio graph and emitting silence-frame artifacts on iOS.
+  src.onended = () => {
+    src.disconnect()
+    gainNode.disconnect()
+  }
   src.start(audioCtx.currentTime)
 }
 
@@ -136,10 +155,8 @@ export function playWheelLands(): void {
   if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
   _getBuffer('/audio/wheel-lands.mp3', 'lands').then(buf => {
     if (buf) _playBuffer(buf, 0.85)
-    setTimeout(() => {
-      if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
-      if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
-    }, 2000)
+    // 2.5s — clip is 2s; cancels any older suspend timer
+    _scheduleSuspend(2500)
   })
 }
 
@@ -151,10 +168,8 @@ export function playCrowdApplause(): void {
   if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
   _getBuffer('/audio/crowd-applause.mp3', 'crowd').then(buf => {
     if (buf) _playBuffer(buf, 1.0)
-    setTimeout(() => {
-      if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
-      if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
-    }, 11000)
+    // 11s — clip is 10s; cancels any older suspend timer
+    _scheduleSuspend(11000)
   })
 }
 
