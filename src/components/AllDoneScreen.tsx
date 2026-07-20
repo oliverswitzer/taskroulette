@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { MOTIVATIONAL_MESSAGES } from '../constants'
+import { playCrowdApplause } from '../audio'
 
 interface AllDoneScreenProps {
   completedCount: number
@@ -20,8 +21,9 @@ export default function AllDoneScreen({
     return template.replace(/\{n\}/g, String(completedCount))
   })
 
-  // Fire confetti on mount
+  // Fire confetti + crowd applause on mount
   useEffect(() => {
+    playCrowdApplause()
     confetti({
       particleCount: 220,
       spread: 100,

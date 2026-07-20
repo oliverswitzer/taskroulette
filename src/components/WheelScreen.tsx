@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
-import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
+import { resumeAudioContext, suspendAudioContext, playTick, playWheelLands } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
@@ -101,6 +101,7 @@ export default function WheelScreen({
       const finalAngle = finalAngleRef.current
 
       suspendAudioContext()
+      playWheelLands()
 
       spinTransitionRef.current = setTimeout(() => {
         if (tasks[winnerIndex]) {
