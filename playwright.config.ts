@@ -41,6 +41,9 @@ export default defineConfig({
       reuseExistingServer: !process.env['CI'],
       timeout: 30000,
       ignoreHTTPSErrors: true,
+      env: process.env['VITE_SKIP_SESSION_LIMIT']
+        ? { VITE_SKIP_SESSION_LIMIT: 'true' }
+        : {},
     },
     {
       command: 'npx tsx server.ts',

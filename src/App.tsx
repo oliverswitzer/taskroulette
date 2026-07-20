@@ -9,7 +9,8 @@ import WheelScreen from './components/WheelScreen'
 import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
-import { parseTasks, parseTasksFromImage } from './api'
+import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
+import EmailGateModal, { TR_EMAIL_KEY } from './components/EmailGateModal'
 import {
   saveTasks,
   loadTasks,
@@ -60,6 +61,8 @@ function fileToBase64(file: File): Promise<string> {
 function App() {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
   const [completedCount, setCompletedCount] = useState<number>(() => loadCompletedCount())
+  const [sessionLimitMsg, setSessionLimitMsg] = useState<string | null>(null)
+  const [showEmailModal, setShowEmailModal] = useState(false)
 
   // Restore TASK_CARD state: check if there's a persisted selected task
   const [appState, setAppState] = useState<AppState>(() => {
@@ -120,6 +123,22 @@ function App() {
   // ── DUMP → PARSING ──────────────────────────────────────────────────────────
   const handleDumpSubmit = async (dump: string, photo?: File) => {
     setParseError(undefined)
+    setSessionLimitMsg(null)
+
+    // Check session limit before spending API call / showing loading state
+    // Skip in test/dev environments to avoid blocking E2E tests
+    if (!import.meta.env.VITE_SKIP_SESSION_LIMIT) {
+      const status = await getSessionStatus()
+      if (!status.allowed) {
+        if (status.reason === 'come_back_tomorrow') {
+          setSessionLimitMsg("You've hit your limit of 3 sessions today. Come back tomorrow 💪")
+        } else if (status.reason === 'needs_email') {
+          setShowEmailModal(true)
+        }
+        return
+      }
+    }
+
     setAppState('PARSING')
     try {
       let parsed: string[]
@@ -252,6 +271,7 @@ function App() {
         ticks: 200,
       })
 
+      recordSessionComplete()
       setAppState('ALL_DONE')
     } else if (remaining.length === 1) {
       // Go directly to TASK_CARD for the last task — skipping WHEEL_IDLE avoids
@@ -330,7 +350,7 @@ function App() {
             transition={pageTransition}
             style={{ position: 'absolute', width: '100%' }}
           >
-            <DumpScreen onSubmit={handleDumpSubmit} error={parseError} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
+            <DumpScreen onSubmit={handleDumpSubmit} error={parseError ?? sessionLimitMsg ?? undefined} photoFile={dumpPhoto} onPhotoChange={setDumpPhoto} />
           </motion.div>
         )}
 
@@ -446,6 +466,34 @@ function App() {
         )}
       </AnimatePresence>
       </div>
+      {/* Email gate modal — shown when session limit hit and no email yet */}
+      {showEmailModal && (
+        <EmailGateModal
+          onSuccess={() => setShowEmailModal(false)}
+          onDismiss={() => setShowEmailModal(false)}
+        />
+      )}
+      {/* Dev-only reset button — clears localStorage + reloads */}
+      {import.meta.env.DEV && (
+        <div style={{ position: 'fixed', top: 8, left: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => { localStorage.clear(); window.location.reload() }}
+            style={{
+              background: 'rgba(255,0,0,0.15)', border: '1px solid rgba(255,0,0,0.3)',
+              color: '#f88', borderRadius: 6, padding: '4px 8px',
+              fontSize: 11, fontFamily: 'monospace', cursor: 'pointer',
+            }}
+          >
+            reset
+          </button>
+          {localStorage.getItem('trEmail') && (
+            <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#0f0', background: 'rgba(0,255,0,0.1)', borderRadius: 6, padding: '4px 8px', border: '1px solid rgba(0,255,0,0.2)' }}>
+              {localStorage.getItem('trEmail')}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

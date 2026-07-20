@@ -8,6 +8,45 @@ function getAnthropicKey(): string {
 
 const anthropic = new Anthropic({ apiKey: getAnthropicKey() })
 
+// ── Session limit tracker (in-memory, IP-based) ───────────────────────────────
+// Resets on server restart — intentional for MVP. Stops casual abuse.
+// 1 free session without email, 3/day once email submitted.
+
+type IpRecord = {
+  date: string       // YYYY-MM-DD UTC
+  count: number      // completed sessions today
+  hasEmail: boolean
+}
+
+const ipRecords = new Map<string, IpRecord>()
+
+function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getRecord(ip: string): IpRecord {
+  const today = todayUTC()
+  const rec = ipRecords.get(ip)
+  if (!rec || rec.date !== today) {
+    const fresh: IpRecord = { date: today, count: 0, hasEmail: rec?.hasEmail ?? false }
+    ipRecords.set(ip, fresh)
+    return fresh
+  }
+  return rec
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getClientIp(c: any): string {
+  return (
+    (c.req.header('x-forwarded-for') ?? '').split(',')[0].trim() ||
+    c.req.header('x-real-ip') ||
+    'unknown'
+  )
+}
+
+const FREE_LIMIT = 1
+const EMAIL_LIMIT = 3
+
 export function createApp() {
   const currentApp = new Hono()
 
@@ -112,6 +151,71 @@ Rules:
   })
 
   currentApp.get('/api/health', (c) => c.json({ ok: true }))
+
+  // ── Session limit endpoints ───────────────────────────────────────────────
+
+  // Called when AllDoneScreen mounts — increments completed session count for IP
+  currentApp.post('/api/session-complete', (c) => {
+    const ip = getClientIp(c)
+    const rec = getRecord(ip)
+    rec.count++
+    ipRecords.set(ip, rec)
+    const limit = rec.hasEmail ? EMAIL_LIMIT : FREE_LIMIT
+    return c.json({ count: rec.count, limit, hasEmail: rec.hasEmail })
+  })
+
+  // Called before submitting dump — lets frontend know if user can start a session
+  currentApp.get('/api/session-status', (c) => {
+    const ip = getClientIp(c)
+    const rec = getRecord(ip)
+    const limit = rec.hasEmail ? EMAIL_LIMIT : FREE_LIMIT
+    const allowed = rec.count < limit
+    const reason = !allowed ? (rec.hasEmail ? 'come_back_tomorrow' : 'needs_email') : undefined
+    return c.json({ allowed, count: rec.count, limit, hasEmail: rec.hasEmail, reason })
+  })
+
+  // Called when user submits email — adds to Loops, unlocks 3/day for IP
+  currentApp.post('/api/submit-email', async (c) => {
+    try {
+      const body = await c.req.json<{ email: string }>()
+      if (!body.email?.trim()) return c.json({ error: 'email required' }, 400)
+
+      const loopsKey = process.env['LOOPS_API_KEY']
+      if (!loopsKey) return c.json({ error: 'Loops not configured' }, 500)
+
+      const res = await fetch('https://app.loops.so/api/v1/contacts/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${loopsKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: body.email.trim(),
+          source: 'taskreoulette-app',
+          userGroup: 'adhd-founder-builds',
+        }),
+      })
+
+      if (!res.ok && res.status !== 409) {
+        // 409 = already exists — that's fine, still mark hasEmail
+        const text = await res.text()
+        console.error('Loops error:', res.status, text)
+        return c.json({ error: 'Failed to subscribe' }, 502)
+      }
+
+      // Mark IP as having submitted email — persists across daily resets
+      const ip = getClientIp(c)
+      const rec = getRecord(ip)
+      rec.hasEmail = true
+      ipRecords.set(ip, rec)
+
+      return c.json({ ok: true })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('submit-email error:', msg)
+      return c.json({ error: msg }, 500)
+    }
+  })
 
   return currentApp
 }
