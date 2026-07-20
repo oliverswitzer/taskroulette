@@ -16,6 +16,7 @@ type IpRecord = {
   date: string       // YYYY-MM-DD UTC
   count: number      // completed sessions today
   hasEmail: boolean
+  email?: string     // stored to check unlimited list
 }
 
 const ipRecords = new Map<string, IpRecord>()
@@ -28,7 +29,7 @@ function getRecord(ip: string): IpRecord {
   const today = todayUTC()
   const rec = ipRecords.get(ip)
   if (!rec || rec.date !== today) {
-    const fresh: IpRecord = { date: today, count: 0, hasEmail: rec?.hasEmail ?? false }
+    const fresh: IpRecord = { date: today, count: 0, hasEmail: rec?.hasEmail ?? false, email: rec?.email }
     ipRecords.set(ip, fresh)
     return fresh
   }
@@ -45,7 +46,8 @@ function getClientIp(c: any): string {
 }
 
 const FREE_LIMIT = 1
-const EMAIL_LIMIT = 3
+const EMAIL_LIMIT = 4
+const UNLIMITED_EMAILS = new Set(['oliverswitzer@gmail.com'])
 
 export function createApp() {
   const currentApp = new Hono()
@@ -168,8 +170,9 @@ Rules:
   currentApp.get('/api/session-status', (c) => {
     const ip = getClientIp(c)
     const rec = getRecord(ip)
+    const unlimited = rec.email && UNLIMITED_EMAILS.has(rec.email)
     const limit = rec.hasEmail ? EMAIL_LIMIT : FREE_LIMIT
-    const allowed = rec.count < limit
+    const allowed = unlimited || rec.count < limit
     const reason = !allowed ? (rec.hasEmail ? 'come_back_tomorrow' : 'needs_email') : undefined
     return c.json({ allowed, count: rec.count, limit, hasEmail: rec.hasEmail, reason })
   })
@@ -207,6 +210,7 @@ Rules:
       const ip = getClientIp(c)
       const rec = getRecord(ip)
       rec.hasEmail = true
+      rec.email = body.email.trim()
       ipRecords.set(ip, rec)
 
       return c.json({ ok: true })
