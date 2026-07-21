@@ -55,16 +55,9 @@ function _init(): void {
 
 // Bootstrap on the first touch/click — fires well before the spin button,
 // so audioEl.play() has resolved long before the user can tap Spin.
-// Also pre-loads all sample buffers so they're decoded and cached before
-// any gesture needs them (avoids iOS gesture-context timeout on first play).
-function _preloadAllBuffers(): void {
-  _getBuffer('/audio/task-complete.mp3', 'complete').catch(() => {})
-  _getBuffer('/audio/wheel-lands.mp3', 'lands').catch(() => {})
-  _getBuffer('/audio/crowd-applause.mp3', 'crowd').catch(() => {})
-}
 if (typeof document !== 'undefined') {
-  document.addEventListener('touchstart', () => { _init(); _preloadAllBuffers() }, { once: true, passive: true })
-  document.addEventListener('click', () => { _init(); _preloadAllBuffers() }, { once: true })
+  document.addEventListener('touchstart', () => { _init() }, { once: true, passive: true })
+  document.addEventListener('click', () => { _init() }, { once: true })
 }
 
 // Call synchronously inside the spin button click handler (user gesture).
@@ -93,20 +86,6 @@ export function suspendAudioContext(): void {
     audioEl.pause()
     audioElReady = false
   }
-}
-
-// Task completion sound — called from the checkbox handler (gesture context).
-// Uses the same fetch+decode pattern as all other sample-based sounds.
-export function playCompletionDing(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 2.5s — clip is 2s, give 500ms headroom; cancels any older suspend timer
-    _scheduleSuspend(2500)
-  })
 }
 
 // ── Sample-based sounds (fetched from public/audio/, cached as AudioBuffer) ──
@@ -146,32 +125,26 @@ function _playBuffer(buf: AudioBuffer, volume = 1.0): void {
   src.start(audioCtx.currentTime)
 }
 
-// Play when wheel lands on a task (called just before TASK_CARD transition).
-// Resumes context inside the same gesture chain as the spin.
-export function playWheelLands(): void {
+// Shared helper for all 3 MP3 sample playback functions.
+function _playSample(url: string, key: string, volume: number, suspendMs: number): void {
   _init()
   if (!audioCtx) return
   audioCtx.resume().catch(() => {})
   if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/wheel-lands.mp3', 'lands').then(buf => {
-    if (buf) _playBuffer(buf, 0.85)
-    // 2.5s — clip is 2s; cancels any older suspend timer
-    _scheduleSuspend(2500)
+  _getBuffer(url, key).then(buf => {
+    if (buf) _playBuffer(buf, volume)
+    _scheduleSuspend(suspendMs)
   })
 }
 
+// Task completion sound — called from the checkbox handler (gesture context).
+export const playCompletionDing = (): void => _playSample('/audio/task-complete.mp3', 'complete', 1.0, 2500)
+
+// Play when wheel lands on a task (called just before TASK_CARD transition).
+export const playWheelLands = (): void => _playSample('/audio/wheel-lands.mp3', 'lands', 0.85, 2500)
+
 // Play crowd applause when all tasks are done (AllDoneScreen mount).
-export function playCrowdApplause(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/crowd-applause.mp3', 'crowd').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 11s — clip is 10s; cancels any older suspend timer
-    _scheduleSuspend(11000)
-  })
-}
+export const playCrowdApplause = (): void => _playSample('/audio/crowd-applause.mp3', 'crowd', 1.0, 11000)
 
 export function playTick(velocity: number): void {
   if (!audioCtx || !audioElReady) return
