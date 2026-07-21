@@ -136,7 +136,4 @@ export function playTick(velocity: number): void {
   bodyGain.connect(dest)
   osc.start(t)
   osc.stop(t + 0.09)
-
-  // Suspend after the tick sound settles (keeps MediaStream idle between spins)
-  _scheduleSuspend(200)
 }
