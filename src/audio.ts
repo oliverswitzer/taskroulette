@@ -16,18 +16,6 @@ let audioElReady = false
 let lastTickTime = 0
 const MIN_TICK_INTERVAL_MS = 18
 
-// Shared suspend timer — always cancelled + rescheduled by each new sound.
-// Prevents an older sound's suspend from killing a newer sound mid-play.
-let _suspendTimer: ReturnType<typeof setTimeout> | null = null
-
-function _scheduleSuspend(delayMs: number): void {
-  if (_suspendTimer !== null) clearTimeout(_suspendTimer)
-  _suspendTimer = setTimeout(() => {
-    _suspendTimer = null
-    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend().catch(() => {})
-    if (audioEl && !audioEl.paused) { audioEl.pause(); audioElReady = false }
-  }, delayMs)
-}
 
 function getDestination(): AudioNode {
   if (mediaStreamDest) return mediaStreamDest
@@ -81,8 +69,6 @@ export function resumeAudioContext(): void {
 // Call when the spin ends — suspends the context AND pauses the audio element
 // so iOS has no active audio session between spins (prevents silence-frame DAC artifacts).
 export function suspendAudioContext(): void {
-  // Cancel any pending auto-suspend from a previous sound
-  if (_suspendTimer !== null) { clearTimeout(_suspendTimer); _suspendTimer = null }
   if (audioCtx && audioCtx.state === 'running') {
     audioCtx.suspend().catch(() => {})
   }
