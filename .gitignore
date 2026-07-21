@@ -17,4 +17,7 @@ dump-*.png
 list-*.png
 parsing-*.png
 
+# Playwright test output
+tests/e2e/test-output/
+
 # Logs
