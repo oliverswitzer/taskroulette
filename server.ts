@@ -49,6 +49,11 @@ const FREE_LIMIT = 1
 const EMAIL_LIMIT = 4
 const UNLIMITED_EMAILS = new Set(['oliverswitzer@gmail.com'])
 
+function extractTasks(text: string): string[] {
+  const raw = text.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim()
+  return JSON.parse(raw) as string[]
+}
+
 export function createApp() {
   const currentApp = new Hono()
 
@@ -83,10 +88,7 @@ Brain dump: "${body.dump}"`
       const content = message.content[0]
       if (content.type !== 'text') return c.json({ error: 'Unexpected response' }, 500)
 
-      // Strip markdown code fences if present (some models add ```json ... ```)
-      const rawText = content.text.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim()
-      const tasks = JSON.parse(rawText) as string[]
-      return c.json({ tasks: tasks.slice(0, 15) })
+      return c.json({ tasks: extractTasks(content.text).slice(0, 15) })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       console.error('Parse error:', message)
@@ -142,9 +144,7 @@ Rules:
       const content = message.content[0]
       if (content.type !== 'text') return c.json({ error: 'Unexpected response' }, 500)
 
-      const rawText = content.text.replace(/^```[a-z]*\n?/im, '').replace(/\n?```$/m, '').trim()
-      const tasks = JSON.parse(rawText) as string[]
-      return c.json({ tasks })
+      return c.json({ tasks: extractTasks(content.text) })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('Parse-image error:', msg)
