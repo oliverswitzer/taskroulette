@@ -4,6 +4,10 @@
 // iOS routing: Web Audio's audioCtx.destination routes to the RINGER channel
 // (silenced by mute switch). We pipe through MediaStreamAudioDestinationNode →
 // <audio> element to use the MEDIA channel instead (volume buttons, not mute).
+//
+// MP3 samples (task-complete, wheel-lands, crowd-applause) are handled by
+// use-sound (Howler.js) in their respective components with html5:true, which
+// also routes through the MEDIA channel natively — no MediaStream needed there.
 
 let audioCtx: AudioContext | null = null
 let mediaStreamDest: MediaStreamAudioDestinationNode | null = null
@@ -88,64 +92,6 @@ export function suspendAudioContext(): void {
   }
 }
 
-// ── Sample-based sounds (fetched from public/audio/, cached as AudioBuffer) ──
-// Files live in public/audio/ — served as static assets by Vite and cached
-// by the PWA service worker after first load. No bundle bloat.
-
-const _decodedBuffers: Map<string, AudioBuffer> = new Map()
-
-async function _getBuffer(url: string, key: string): Promise<AudioBuffer | null> {
-  if (_decodedBuffers.has(key)) return _decodedBuffers.get(key)!
-  if (!audioCtx) return null
-  try {
-    const res = await fetch(url)
-    const arrayBuf = await res.arrayBuffer()
-    const buf = await audioCtx.decodeAudioData(arrayBuf)
-    _decodedBuffers.set(key, buf)
-    return buf
-  } catch {
-    return null
-  }
-}
-
-function _playBuffer(buf: AudioBuffer, volume = 1.0): void {
-  if (!audioCtx) return
-  const src = audioCtx.createBufferSource()
-  src.buffer = buf
-  const gainNode = audioCtx.createGain()
-  gainNode.gain.value = volume
-  src.connect(gainNode)
-  gainNode.connect(getDestination())
-  // Disconnect nodes when playback finishes — prevents orphaned nodes from
-  // accumulating in the audio graph and emitting silence-frame artifacts on iOS.
-  src.onended = () => {
-    src.disconnect()
-    gainNode.disconnect()
-  }
-  src.start(audioCtx.currentTime)
-}
-
-// Shared helper for all 3 MP3 sample playback functions.
-function _playSample(url: string, key: string, volume: number, suspendMs: number): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer(url, key).then(buf => {
-    if (buf) _playBuffer(buf, volume)
-    _scheduleSuspend(suspendMs)
-  })
-}
-
-// Task completion sound — called from the checkbox handler (gesture context).
-export const playCompletionDing = (): void => _playSample('/audio/task-complete.mp3', 'complete', 1.0, 2500)
-
-// Play when wheel lands on a task (called just before TASK_CARD transition).
-export const playWheelLands = (): void => _playSample('/audio/wheel-lands.mp3', 'lands', 0.85, 2500)
-
-// Play crowd applause when all tasks are done (AllDoneScreen mount).
-export const playCrowdApplause = (): void => _playSample('/audio/crowd-applause.mp3', 'crowd', 1.0, 11000)
-
 export function playTick(velocity: number): void {
   if (!audioCtx || !audioElReady) return
   if (audioCtx.state !== 'running') return
@@ -190,4 +136,7 @@ export function playTick(velocity: number): void {
   bodyGain.connect(dest)
   osc.start(t)
   osc.stop(t + 0.09)
+
+  // Suspend after the tick sound settles (keeps MediaStream idle between spins)
+  _scheduleSuspend(200)
 }

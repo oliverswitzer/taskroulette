@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import useSound from 'use-sound'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { MOTIVATIONAL_MESSAGES } from '../constants'
-import { playCrowdApplause } from '../audio'
 import EmailGateModal, { TR_EMAIL_KEY } from './EmailGateModal'
 
 interface AllDoneScreenProps {
@@ -19,6 +19,11 @@ export default function AllDoneScreen({
       Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)
     ]
     return template.replace(/\{n\}/g, String(completedCount))
+  })
+
+  const [playCrowdApplause] = useSound('/audio/crowd-applause.mp3', {
+    volume: 1.0,
+    html5: true, // forces <audio> element → iOS MEDIA channel (not ringer)
   })
 
   // Show email modal after applause settles (~10s) — unless already submitted
@@ -51,7 +56,7 @@ export default function AllDoneScreen({
       clearTimeout(timer2)
       if (modalTimer) clearTimeout(modalTimer)
     }
-  }, [])
+  }, [playCrowdApplause])
 
   return (
     <div
