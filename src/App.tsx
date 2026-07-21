@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { AppState, Task } from './types'
@@ -94,6 +94,10 @@ function App() {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [parseError, setParseError] = useState<string | undefined>()
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
+
+  // Keep a ref to appState for the popstate handler (avoids stale closure)
+  const appStateRef = useRef(appState)
 
   const [wheelAngle, setWheelAngle] = useState<number>(() => {
     const sel = loadSelectedTask()
@@ -112,6 +116,53 @@ function App() {
   useEffect(() => { saveAppState(appState) }, [appState])
   useEffect(() => { saveTasks(tasks) }, [tasks])
   useEffect(() => { saveCompletedCount(completedCount) }, [completedCount])
+
+  // Keep appStateRef in sync
+  useEffect(() => { appStateRef.current = appState }, [appState])
+
+  // ── History management (pushState / popstate) ─────────────────────────────
+  // On mount, seed the initial history entry so there's always something to go back from.
+  useEffect(() => {
+    history.replaceState({ state: appState }, '')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePopState = useRef<(e: PopStateEvent) => void>(() => {})
+  useEffect(() => {
+    handlePopState.current = (e: PopStateEvent) => {
+      const histState = e.state as { state?: string } | null
+      const current = appStateRef.current
+
+      if (current === 'WHEEL_IDLE' || current === 'WHEEL_SPINNING') {
+        // Browser Back from wheel → go to LIST_EDIT (same as "Edit Tasks" button)
+        // But don't push a new entry here — we're already navigating back
+        setAppState('LIST_EDIT')
+        setIsEditModalOpen(false)
+        // Push a new EDIT state so the next back works
+        history.pushState({ state: 'EDIT' }, '')
+        return
+      }
+
+      if (current === 'LIST_EDIT') {
+        // Browser Back from edit → show confirmation modal
+        // Push a synthetic entry back so we stay on the edit page while modal is open
+        history.pushState({ state: 'EDIT' }, '')
+        setShowBackConfirm(true)
+        return
+      }
+
+      // For all other states, ignore / let default behavior happen
+      // Restore the entry so the user doesn't escape unexpectedly
+      if (histState?.state) {
+        history.pushState({ state: current }, '')
+      }
+    }
+  }, []) // handler reads from refs, no deps needed
+
+  useEffect(() => {
+    const listener = (e: PopStateEvent) => handlePopState.current(e)
+    window.addEventListener('popstate', listener)
+    return () => window.removeEventListener('popstate', listener)
+  }, [])
 
   // Expose window helpers for Playwright tests
   useEffect(() => {
@@ -164,6 +215,7 @@ function App() {
       setTasks(newTasks)
       setDumpPhoto(null)
       setAppState('LIST_EDIT')
+      history.pushState({ state: 'EDIT' }, '')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong'
       setParseError(msg)
@@ -194,6 +246,7 @@ function App() {
   const handleProceed = () => {
     saveAppState('WHEEL_IDLE')
     setAppState('WHEEL_IDLE')
+    history.pushState({ state: 'WHEEL' }, '')
   }
 
   // ── Auto-show task card when only 1 task remains ─────────────────────────────
@@ -472,6 +525,104 @@ function App() {
           onSuccess={() => setShowEmailModal(false)}
           onDismiss={() => setShowEmailModal(false)}
         />
+      )}
+      {/* Back confirmation modal — shown when user presses browser Back on LIST_EDIT */}
+      {showBackConfirm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9000,
+            padding: '0 20px',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--rounded-lg)',
+              padding: '28px 24px 24px',
+              maxWidth: 380,
+              width: '100%',
+              boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '1.125rem',
+                fontWeight: 700,
+                color: 'var(--color-ink)',
+                marginBottom: 8,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Go back?
+            </h2>
+            <p
+              style={{
+                fontSize: '0.9375rem',
+                color: 'var(--color-ink-muted)',
+                lineHeight: 1.5,
+                marginBottom: 24,
+              }}
+            >
+              Are you sure you want to go back? You&apos;ll lose all your current tasks!
+            </p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(false)}
+                style={{
+                  flex: 1,
+                  background: 'var(--color-surface2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--rounded-md)',
+                  padding: '0 20px',
+                  minHeight: 48,
+                  fontSize: '0.9375rem',
+                  fontWeight: 600,
+                  color: 'var(--color-ink)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="back-confirm-btn"
+                onClick={() => {
+                  setShowBackConfirm(false)
+                  clearAll()
+                  setTasks([])
+                  setCompletedCount(0)
+                  setSelectedTask(null)
+                  setSelectedIndex(null)
+                  setDumpPhoto(null)
+                  setAppState('DUMP')
+                  history.replaceState({ state: 'DUMP' }, '')
+                }}
+                style={{
+                  flex: 1,
+                  background: 'oklch(40% 0.18 25)',
+                  border: 'none',
+                  borderRadius: 'var(--rounded-md)',
+                  padding: '0 20px',
+                  minHeight: 48,
+                  fontSize: '0.9375rem',
+                  fontWeight: 700,
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {/* Dev-only reset button — clears localStorage + reloads */}
       {import.meta.env.DEV && (
