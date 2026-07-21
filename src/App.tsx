@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useHistoryNav } from './hooks/useHistoryNav'
 import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { AppState, Task } from './types'
@@ -96,9 +97,6 @@ function App() {
   const [parseError, setParseError] = useState<string | undefined>()
   const [showBackConfirm, setShowBackConfirm] = useState(false)
 
-  // Keep a ref to appState for the popstate handler (avoids stale closure)
-  const appStateRef = useRef(appState)
-
   const [wheelAngle, setWheelAngle] = useState<number>(() => {
     const sel = loadSelectedTask()
     return sel?.angle ?? 0
@@ -117,52 +115,17 @@ function App() {
   useEffect(() => { saveTasks(tasks) }, [tasks])
   useEffect(() => { saveCompletedCount(completedCount) }, [completedCount])
 
-  // Keep appStateRef in sync
-  useEffect(() => { appStateRef.current = appState }, [appState])
-
-  // ── History management (pushState / popstate) ─────────────────────────────
-  // On mount, seed the initial history entry so there's always something to go back from.
-  useEffect(() => {
-    history.replaceState({ state: appState }, '')
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handlePopState = useRef<(e: PopStateEvent) => void>(() => {})
-  useEffect(() => {
-    handlePopState.current = (e: PopStateEvent) => {
-      const histState = e.state as { state?: string } | null
-      const current = appStateRef.current
-
-      if (current === 'WHEEL_IDLE' || current === 'WHEEL_SPINNING') {
-        // Browser Back from wheel → go to LIST_EDIT (same as "Edit Tasks" button)
-        // But don't push a new entry here — we're already navigating back
-        setAppState('LIST_EDIT')
-        setIsEditModalOpen(false)
-        // Push a new EDIT state so the next back works
-        history.pushState({ state: 'EDIT' }, '')
-        return
-      }
-
-      if (current === 'LIST_EDIT') {
-        // Browser Back from edit → show confirmation modal
-        // Push a synthetic entry back so we stay on the edit page while modal is open
-        history.pushState({ state: 'EDIT' }, '')
-        setShowBackConfirm(true)
-        return
-      }
-
-      // For all other states, ignore / let default behavior happen
-      // Restore the entry so the user doesn't escape unexpectedly
-      if (histState?.state) {
-        history.pushState({ state: current }, '')
-      }
-    }
-  }, []) // handler reads from refs, no deps needed
-
-  useEffect(() => {
-    const listener = (e: PopStateEvent) => handlePopState.current(e)
-    window.addEventListener('popstate', listener)
-    return () => window.removeEventListener('popstate', listener)
-  }, [])
+  // ── History management — back-button navigation ───────────────────────────
+  const historyHandlers = {
+    onBackFromWheel: useCallback(() => {
+      setAppState('LIST_EDIT')
+      setIsEditModalOpen(false)
+    }, []),
+    onBackFromEdit: useCallback(() => {
+      setShowBackConfirm(true)
+    }, []),
+  }
+  useHistoryNav(appState, historyHandlers)
 
   // Expose window helpers for Playwright tests
   useEffect(() => {
