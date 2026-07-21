@@ -6,4 +6,15 @@ playwright-report/
 *.crt
 *.key
 .vercel
-.env.local
+# TLS certs (local dev HTTPS)
+*.crt
+*.key
+
+# Screenshot artifacts
+tests/e2e/screenshots/*.png
+scripts/debug/output/
+dump-*.png
+list-*.png
+parsing-*.png
+
+# Logs
