@@ -20,7 +20,7 @@ test('screenshot wheel explosion confetti', async ({ page }) => {
   // Capture during the burst — before AllDone screen fully renders
   await page.waitForTimeout(180)
   await page.screenshot({
-    path: 'tests/e2e/screenshots/wheel-explosion-burst.png',
+    path: 'scripts/debug/output/wheel-explosion-burst.png',
     fullPage: false,
   })
 
@@ -28,7 +28,7 @@ test('screenshot wheel explosion confetti', async ({ page }) => {
   await page.waitForSelector('[data-testid="all-done-screen"]', { timeout: 4000 })
   await page.waitForTimeout(700)
   await page.screenshot({
-    path: 'tests/e2e/screenshots/wheel-explosion-alldone.png',
+    path: 'scripts/debug/output/wheel-explosion-alldone.png',
     fullPage: false,
   })
 })

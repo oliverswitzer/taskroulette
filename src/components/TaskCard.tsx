@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
+import useSound from 'use-sound'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import type { Task } from '../types'
-import { playCompletionDing } from '../audio'
 
 interface TaskCardProps {
   task: Task
@@ -30,6 +30,10 @@ export default function TaskCard({
 }: TaskCardProps) {
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [playCompletionDing] = useSound('/audio/task-complete.mp3', {
+    volume: 1.0,
+    html5: true, // forces <audio> element → iOS MEDIA channel (not ringer)
+  })
 
   const handleCheck = useCallback(() => {
     if (checked || completing) return
@@ -40,7 +44,7 @@ export default function TaskCard({
     setTimeout(() => {
       onComplete()
     }, 800)
-  }, [checked, completing, onComplete])
+  }, [checked, completing, onComplete, playCompletionDing])
 
   return (
     <div

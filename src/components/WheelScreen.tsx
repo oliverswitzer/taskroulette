@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import useSound from 'use-sound'
 import { motion } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
-import { resumeAudioContext, suspendAudioContext, playTick, playWheelLands } from '../audio'
+import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
@@ -47,6 +48,11 @@ export default function WheelScreen({
 
   const { physics, startSpin } = useWheelPhysics(tasks.length)
   const isSpinning = physics.isSpinning
+
+  const [playWheelLands] = useSound('/audio/wheel-lands.mp3', {
+    volume: 0.85,
+    html5: true, // forces <audio> element → iOS MEDIA channel (not ringer)
+  })
 
   // Ticker deflection state — bounces on each peg hit
   const [tickerDeflection, setTickerDeflection] = useState(0)

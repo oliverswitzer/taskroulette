@@ -4,6 +4,10 @@
 // iOS routing: Web Audio's audioCtx.destination routes to the RINGER channel
 // (silenced by mute switch). We pipe through MediaStreamAudioDestinationNode →
 // <audio> element to use the MEDIA channel instead (volume buttons, not mute).
+//
+// MP3 samples (task-complete, wheel-lands, crowd-applause) are handled by
+// use-sound (Howler.js) in their respective components with html5:true, which
+// also routes through the MEDIA channel natively — no MediaStream needed there.
 
 let audioCtx: AudioContext | null = null
 let mediaStreamDest: MediaStreamAudioDestinationNode | null = null
@@ -55,16 +59,9 @@ function _init(): void {
 
 // Bootstrap on the first touch/click — fires well before the spin button,
 // so audioEl.play() has resolved long before the user can tap Spin.
-// Also pre-loads all sample buffers so they're decoded and cached before
-// any gesture needs them (avoids iOS gesture-context timeout on first play).
-function _preloadAllBuffers(): void {
-  _getBuffer('/audio/task-complete.mp3', 'complete').catch(() => {})
-  _getBuffer('/audio/wheel-lands.mp3', 'lands').catch(() => {})
-  _getBuffer('/audio/crowd-applause.mp3', 'crowd').catch(() => {})
-}
 if (typeof document !== 'undefined') {
-  document.addEventListener('touchstart', () => { _init(); _preloadAllBuffers() }, { once: true, passive: true })
-  document.addEventListener('click', () => { _init(); _preloadAllBuffers() }, { once: true })
+  document.addEventListener('touchstart', () => { _init() }, { once: true, passive: true })
+  document.addEventListener('click', () => { _init() }, { once: true })
 }
 
 // Call synchronously inside the spin button click handler (user gesture).
@@ -93,84 +90,6 @@ export function suspendAudioContext(): void {
     audioEl.pause()
     audioElReady = false
   }
-}
-
-// Task completion sound — called from the checkbox handler (gesture context).
-// Uses the same fetch+decode pattern as all other sample-based sounds.
-export function playCompletionDing(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/task-complete.mp3', 'complete').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 2.5s — clip is 2s, give 500ms headroom; cancels any older suspend timer
-    _scheduleSuspend(2500)
-  })
-}
-
-// ── Sample-based sounds (fetched from public/audio/, cached as AudioBuffer) ──
-// Files live in public/audio/ — served as static assets by Vite and cached
-// by the PWA service worker after first load. No bundle bloat.
-
-const _decodedBuffers: Map<string, AudioBuffer> = new Map()
-
-async function _getBuffer(url: string, key: string): Promise<AudioBuffer | null> {
-  if (_decodedBuffers.has(key)) return _decodedBuffers.get(key)!
-  if (!audioCtx) return null
-  try {
-    const res = await fetch(url)
-    const arrayBuf = await res.arrayBuffer()
-    const buf = await audioCtx.decodeAudioData(arrayBuf)
-    _decodedBuffers.set(key, buf)
-    return buf
-  } catch {
-    return null
-  }
-}
-
-function _playBuffer(buf: AudioBuffer, volume = 1.0): void {
-  if (!audioCtx) return
-  const src = audioCtx.createBufferSource()
-  src.buffer = buf
-  const gainNode = audioCtx.createGain()
-  gainNode.gain.value = volume
-  src.connect(gainNode)
-  gainNode.connect(getDestination())
-  // Disconnect nodes when playback finishes — prevents orphaned nodes from
-  // accumulating in the audio graph and emitting silence-frame artifacts on iOS.
-  src.onended = () => {
-    src.disconnect()
-    gainNode.disconnect()
-  }
-  src.start(audioCtx.currentTime)
-}
-
-// Play when wheel lands on a task (called just before TASK_CARD transition).
-// Resumes context inside the same gesture chain as the spin.
-export function playWheelLands(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/wheel-lands.mp3', 'lands').then(buf => {
-    if (buf) _playBuffer(buf, 0.85)
-    // 2.5s — clip is 2s; cancels any older suspend timer
-    _scheduleSuspend(2500)
-  })
-}
-
-// Play crowd applause when all tasks are done (AllDoneScreen mount).
-export function playCrowdApplause(): void {
-  _init()
-  if (!audioCtx) return
-  audioCtx.resume().catch(() => {})
-  if (audioEl) audioEl.play().then(() => { audioElReady = true }).catch(() => {})
-  _getBuffer('/audio/crowd-applause.mp3', 'crowd').then(buf => {
-    if (buf) _playBuffer(buf, 1.0)
-    // 11s — clip is 10s; cancels any older suspend timer
-    _scheduleSuspend(11000)
-  })
 }
 
 export function playTick(velocity: number): void {
