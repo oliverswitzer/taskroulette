@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useHistoryNav } from './hooks/useHistoryNav'
 import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
+import { Analytics } from '@vercel/analytics/react'
 import type { AppState, Task } from './types'
 import DumpScreen from './components/DumpScreen'
 import ParsingScreen from './components/ParsingScreen'
@@ -608,6 +609,7 @@ function App() {
           )}
         </div>
       )}
+      <Analytics />
     </div>
   )
 }
