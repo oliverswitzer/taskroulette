@@ -21,3 +21,4 @@ parsing-*.png
 tests/e2e/test-output/
 
 # Logs
+.env.local
