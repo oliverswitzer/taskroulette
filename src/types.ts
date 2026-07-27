@@ -34,3 +34,25 @@ export interface AppStore {
   selectedTask: Task | null
   winningSliceIndex: number | null
 }
+
+// ── Google Tasks integration ──────────────────────────────────────────────────
+
+export interface GoogleTask {
+  id: string
+  title: string
+  due?: string          // ISO 8601 date string, e.g. "2024-01-15T00:00:00.000Z"
+  listId: string
+  listTitle: string
+  status: 'needsAction' | 'completed'
+}
+
+export type GoogleTaskBucket = 'overdue' | 'today' | 'thisWeek' | 'later' | 'noDue'
+
+export type GoogleAuthState = 'idle' | 'loading' | 'authenticated' | 'error'
+
+export interface GoogleTasksState {
+  authState: GoogleAuthState
+  tasks: GoogleTask[]
+  error: string | null
+  isLoading: boolean
+}
