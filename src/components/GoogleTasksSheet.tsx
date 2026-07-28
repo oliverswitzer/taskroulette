@@ -100,7 +100,11 @@ export default function GoogleTasksSheet({
             transition={isOpen ? SPRING : SPRING_EXIT}
             style={{
               position: 'fixed',
-              bottom: 0, left: 0, right: 0,
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '100%',
+              maxWidth: 480,
               height: '88svh',
               background: 'oklch(18% 0.025 260)',
               borderRadius: '20px 20px 0 0',
@@ -192,7 +196,7 @@ export default function GoogleTasksSheet({
                             textAlign: 'center',
                           }}
                         >
-                          Show {hiddenCount} more tasks →
+                          Show {hiddenCount} more {hiddenCount === 1 ? 'task' : 'tasks'} →
                         </button>
                       )}
                     </>
