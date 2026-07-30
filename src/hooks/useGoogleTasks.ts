@@ -1,41 +1,64 @@
 /**
- * useGoogleTasks — manages Google OAuth token lifecycle + task fetching.
- *
- * Token storage: sessionStorage only (not localStorage — access token is short-lived,
- * we don't want it persisting beyond the browser session).
+ * useGoogleTasks — manages Google OAuth via Supabase Auth + direct Google Tasks API calls.
  *
  * Flow:
- * 1. On mount, check sessionStorage for existing token
- * 2. Also check URL hash for token returned from OAuth callback
- * 3. If no token → authState = 'idle'
- * 4. If token exists → authState = 'authenticated', fetch tasks
- * 5. If token expired (401) → clear token, authState = 'idle'
+ * 1. signInWithOAuth({ provider: 'google', scopes: tasks.readonly }) → Supabase handles OAuth
+ * 2. On return, getSession() gives us provider_token (Google access token)
+ * 3. Call Google Tasks API directly from frontend using that token
+ * 4. No server routes needed for auth — Supabase handles everything
  */
 import { useState, useEffect, useCallback } from 'react'
 import type { GoogleTask, GoogleAuthState } from '../types'
 import { sortTasksByDue } from '../googleTasks'
+import { supabase } from '../lib/supabase'
 
-const TOKEN_KEY = 'google_access_token'
+const GOOGLE_TASKS_BASE = 'https://tasks.googleapis.com/tasks/v1'
 
-// Mock data for development/testing when OAuth isn't configured
-const MOCK_TASKS: GoogleTask[] = [
-  { id: 'm1', title: 'Review Q4 OKRs', due: new Date(Date.now() - 2 * 86400000).toISOString(), listId: 'l1', listTitle: 'Work', status: 'needsAction' },
-  { id: 'm2', title: 'Call dentist for appointment', due: new Date(Date.now() - 86400000).toISOString(), listId: 'l2', listTitle: 'Personal', status: 'needsAction' },
-  { id: 'm3', title: 'Submit expense report', due: new Date().toISOString(), listId: 'l1', listTitle: 'Work', status: 'needsAction' },
-  { id: 'm4', title: 'Fix navbar bug', due: new Date(Date.now() + 2 * 86400000).toISOString(), listId: 'l1', listTitle: 'Work', status: 'needsAction' },
-  { id: 'm5', title: 'Book flights for July', due: new Date(Date.now() + 3 * 86400000).toISOString(), listId: 'l2', listTitle: 'Personal', status: 'needsAction' },
-  { id: 'm6', title: 'Read Atomic Habits chapter 3', due: new Date(Date.now() + 5 * 86400000).toISOString(), listId: 'l3', listTitle: 'Learning', status: 'needsAction' },
-  { id: 'm7', title: 'Update resume', due: new Date(Date.now() + 10 * 86400000).toISOString(), listId: 'l2', listTitle: 'Personal', status: 'needsAction' },
-  { id: 'm8', title: 'Pay quarterly taxes', due: new Date(Date.now() + 20 * 86400000).toISOString(), listId: 'l2', listTitle: 'Personal', status: 'needsAction' },
-  { id: 'm9', title: 'Write retrospective notes', listId: 'l1', listTitle: 'Work', status: 'needsAction' },
-]
+interface GoogleTasksListResponse {
+  items?: Array<{ id: string; title: string; due?: string; status: string }>
+  nextPageToken?: string
+}
+interface GoogleTaskListsResponse {
+  items?: Array<{ id: string; title: string }>
+}
+
+async function fetchAllGoogleTasks(accessToken: string): Promise<GoogleTask[]> {
+  const listsRes = await fetch(`${GOOGLE_TASKS_BASE}/users/@me/lists?maxResults=20`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!listsRes.ok) throw new Error(`Failed to fetch task lists: ${listsRes.status}`)
+  const lists = await listsRes.json() as GoogleTaskListsResponse
+  if (!lists.items?.length) return []
+
+  const allTasks: GoogleTask[] = []
+  await Promise.all(lists.items.map(async (list) => {
+    const res = await fetch(
+      `${GOOGLE_TASKS_BASE}/lists/${list.id}/tasks?showCompleted=false&maxResults=100`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    )
+    if (!res.ok) return
+    const data = await res.json() as GoogleTasksListResponse
+    for (const task of data.items ?? []) {
+      if (task.status === 'completed') continue
+      allTasks.push({
+        id: task.id,
+        title: task.title || '(no title)',
+        due: task.due,
+        status: task.status as 'needsAction',
+        listId: list.id,
+        listTitle: list.title,
+      })
+    }
+  }))
+  return allTasks
+}
 
 interface UseGoogleTasksReturn {
   authState: GoogleAuthState
   tasks: GoogleTask[]
   isLoading: boolean
   error: string | null
-  isMockMode: boolean
+  isMockMode: false
   login: () => Promise<void>
   logout: () => void
   refetch: () => Promise<void>
@@ -46,27 +69,13 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
   const [tasks, setTasks] = useState<GoogleTask[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isMockMode, setIsMockMode] = useState(false)
 
-  const fetchTasks = useCallback(async (token: string) => {
+  const fetchTasks = useCallback(async (accessToken: string) => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/google/tasks', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.status === 401) {
-        sessionStorage.removeItem(TOKEN_KEY)
-        setAuthState('idle')
-        setTasks([])
-        return
-      }
-      if (!res.ok) {
-        const data = await res.json() as { error?: string }
-        throw new Error(data.error ?? `HTTP ${res.status}`)
-      }
-      const data = await res.json() as { tasks: GoogleTask[] }
-      setTasks(sortTasksByDue(data.tasks))
+      const fetched = await fetchAllGoogleTasks(accessToken)
+      setTasks(sortTasksByDue(fetched))
       setAuthState('authenticated')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -76,45 +85,40 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
     }
   }, [])
 
-  // On mount: check sessionStorage + URL hash for token
+  // On mount: check for existing Supabase session with Google provider_token
   useEffect(() => {
-    // Check URL hash (set by OAuth callback redirect)
-    const hash = window.location.hash
-    if (hash.includes('google_token=')) {
-      const params = new URLSearchParams(hash.slice(1))
-      const token = params.get('google_token')
-      if (token) {
-        sessionStorage.setItem(TOKEN_KEY, decodeURIComponent(token))
-        // Clean hash from URL
-        window.history.replaceState(null, '', window.location.pathname)
-        fetchTasks(decodeURIComponent(token))
-        return
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.provider_token) {
+        fetchTasks(session.provider_token)
       }
-    }
+    })
 
-    // Check sessionStorage
-    const stored = sessionStorage.getItem(TOKEN_KEY)
-    if (stored) {
-      fetchTasks(stored)
-    }
+    // Listen for auth state changes (e.g. return from OAuth redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.provider_token) {
+        fetchTasks(session.provider_token)
+      } else if (!session) {
+        setAuthState('idle')
+        setTasks([])
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [fetchTasks])
 
   const login = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/google/auth-url?origin=${encodeURIComponent(window.location.origin)}`)
-      if (res.status === 503) {
-        // OAuth not configured — use mock data for development
-        setIsMockMode(true)
-        setTasks(sortTasksByDue(MOCK_TASKS))
-        setAuthState('authenticated')
-        setIsLoading(false)
-        return
-      }
-      if (!res.ok) throw new Error(`Failed to get auth URL: ${res.status}`)
-      const { url } = await res.json() as { url: string }
-      window.location.href = url
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/tasks.readonly',
+          redirectTo: window.location.origin,
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      })
+      if (authError) throw authError
+      // browser will redirect — no further action needed here
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setAuthState('error')
@@ -122,19 +126,17 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
     }
   }, [])
 
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(TOKEN_KEY)
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut()
     setAuthState('idle')
     setTasks([])
     setError(null)
-    setIsMockMode(false)
   }, [])
 
   const refetch = useCallback(async () => {
-    const token = sessionStorage.getItem(TOKEN_KEY)
-    if (!token) return
-    await fetchTasks(token)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.provider_token) await fetchTasks(session.provider_token)
   }, [fetchTasks])
 
-  return { authState, tasks, isLoading, error, isMockMode, login, logout, refetch }
+  return { authState, tasks, isLoading, error, isMockMode: false, login, logout, refetch }
 }
