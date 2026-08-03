@@ -93,19 +93,26 @@ export default function GoogleTasksSheet({
           />
 
           {/* Sheet */}
+          <div style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            zIndex: 41,
+            pointerEvents: 'none',
+          }}>
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={isOpen ? SPRING : SPRING_EXIT}
             style={{
-              position: 'fixed',
-              bottom: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
               width: '100%',
               maxWidth: 480,
               height: '88svh',
+              pointerEvents: 'all',
               background: 'oklch(18% 0.025 260)',
               borderRadius: '20px 20px 0 0',
               zIndex: 41,
@@ -239,6 +246,7 @@ export default function GoogleTasksSheet({
               </motion.div>
             )}
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

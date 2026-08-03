@@ -49,14 +49,24 @@ npm run test        # vitest unit + component
 npm run test:e2e    # playwright (both mobile + desktop projects)
 ```
 
+### Secrets / environment
+
+**Always use direnv.** The repo has `.envrc` (gitignored, contains real secrets) and `.envrc.sample` (tracked, shows what keys are required). Never create `.env` files. Never overwrite `.envrc` — only append to it. Always source secrets before running any server or test:
+
+```bash
+direnv allow   # once, to trust the .envrc
+# or manually:
+source .envrc
+```
+
 ### Starting the servers (required for E2E)
 
 ```bash
-# Terminal 1 — Hono backend (reads ANTHROPIC_API_KEY from ~/.envrc)
-source ~/.envrc && npm run server
+# Terminal 1 — Hono backend (secrets loaded via direnv)
+direnv exec . npm run server
 
 # Terminal 2 — Vite frontend (Tailscale accessible)
-npm run dev
+direnv exec . npm run dev
 ```
 
 Playwright's `reuseExistingServer: true` means it won't double-start if they're already running.
