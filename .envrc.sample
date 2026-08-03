@@ -8,6 +8,10 @@ export GOOGLE_CLIENT_ID=""
 export GOOGLE_CLIENT_SECRET=""
 
 # Vercel deploy (only needed for manual deploys outside CI)
-export VERCEL_TOKEN=""
+export VERCEL_TOKEN=***
 export VERCEL_ORG_ID=""
 export VERCEL_PROJECT_ID=""
+
+# Supabase (used by CI to run migrations)
+export SUPABASE_PROJECT_ID="kdkglemrnpxifnfgylvm"
+export SUPABASE_SERVICE_ROLE_KEY=***
