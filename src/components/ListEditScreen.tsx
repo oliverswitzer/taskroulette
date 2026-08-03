@@ -4,7 +4,6 @@ import type { Task, GoogleTask } from '../types'
 import { MAX_TASKS } from '../constants'
 import TaskForm from './TaskForm'
 import GoogleTasksSheet from './GoogleTasksSheet'
-import BetaSignupModal from './BetaSignupModal'
 
 interface ListEditScreenProps {
   tasks: Task[]
@@ -26,7 +25,6 @@ export default function ListEditScreen({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showGoogleSheet, setShowGoogleSheet] = useState(false)
-  const [showBetaModal, setShowBetaModal] = useState(false)
 
   const count = tasks.length
   const isWarning = count >= MAX_TASKS - 1
@@ -257,7 +255,7 @@ export default function ListEditScreen({
           <div style={{ position: 'relative', width: '100%' }}>
             <motion.button
               type="button"
-              onClick={() => setShowBetaModal(true)}
+              onClick={() => setShowGoogleSheet(true)}
               aria-label="Import from Google Tasks"
               data-testid="google-tasks-btn"
               whileTap={{ scale: 0.98 }}
@@ -286,30 +284,6 @@ export default function ListEditScreen({
               </svg>
               Import from Google Tasks
             </motion.button>
-            {/* Beta tag — positioned top-right of button */}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setShowBetaModal(true) }}
-              aria-label="Beta — request early access"
-              style={{
-                position: 'absolute',
-                top: -10,
-                right: 12,
-                background: 'oklch(65% 0.2 40)',
-                color: '#fff',
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                padding: '2px 7px',
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                lineHeight: 1.6,
-              }}
-            >
-              Beta
-            </button>
           </div>
         )}
       </div>
@@ -362,10 +336,6 @@ export default function ListEditScreen({
         onImport={handleGoogleImport}
       />
 
-      {/* Beta signup modal — slides up when user clicks Google Tasks button or Beta tag */}
-      {showBetaModal && (
-        <BetaSignupModal onClose={() => setShowBetaModal(false)} />
-      )}
     </>
   )
 }

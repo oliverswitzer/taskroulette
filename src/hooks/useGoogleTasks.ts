@@ -96,6 +96,12 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
     // Listen for auth state changes (e.g. return from OAuth redirect)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.provider_token) {
+        // Clear OAuth return flag now that auth is complete
+        sessionStorage.removeItem('oauth_returning')
+        // Clean up OAuth callback params from URL without triggering a popstate
+        if (window.location.hash || window.location.search.includes('code=')) {
+          history.replaceState(history.state, '', window.location.pathname)
+        }
         fetchTasks(session.provider_token)
       } else if (!session) {
         setAuthState('idle')
@@ -109,6 +115,9 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
     setIsLoading(true)
     setError(null)
     try {
+      // Flag survives the full-page redirect so popstate handler can suppress
+      // the "Go back?" modal when we return from OAuth
+      sessionStorage.setItem('oauth_returning', '1')
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

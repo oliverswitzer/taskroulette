@@ -41,6 +41,15 @@ export function useHistoryNav(
       }
 
       if (current === 'LIST_EDIT') {
+        // Suppress back confirmation if this popstate is from a Supabase OAuth return
+        const hash = window.location.hash
+        const search = window.location.search
+        if (
+          hash.includes('access_token') || hash.includes('refresh_token') || search.includes('code=') ||
+          sessionStorage.getItem('oauth_returning') === '1'
+        ) {
+          return
+        }
         history.pushState({ state: 'EDIT' }, '')
         handlers.onBackFromEdit()
         return
