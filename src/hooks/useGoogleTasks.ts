@@ -26,14 +26,14 @@ interface GoogleTaskListsResponse {
 
 // Google user_metadata on the Supabase session — full_name/given_name/family_name are
 // populated straight from the Google OAuth response, no extra API call needed.
-interface GoogleUserMetadata {
+export interface GoogleUserMetadata {
   full_name?: string
   name?: string
   given_name?: string
   family_name?: string
 }
 
-function splitName(meta: GoogleUserMetadata): { firstName?: string; lastName?: string } {
+export function splitName(meta: GoogleUserMetadata): { firstName?: string; lastName?: string } {
   if (meta.given_name || meta.family_name) {
     return { firstName: meta.given_name, lastName: meta.family_name }
   }
@@ -45,7 +45,7 @@ function splitName(meta: GoogleUserMetadata): { firstName?: string; lastName?: s
 
 // Fire-and-forget: submit the Google-verified email + name to Loops once per browser,
 // so the email gate never has to ask a user who already signed in with Google.
-async function syncGoogleContactToLoops(email: string | undefined, meta: GoogleUserMetadata): Promise<void> {
+export async function syncGoogleContactToLoops(email: string | undefined, meta: GoogleUserMetadata): Promise<void> {
   if (!email || localStorage.getItem(TR_EMAIL_KEY)) return
   const { firstName, lastName } = splitName(meta)
   const result = await submitEmail(email, { firstName, lastName })
