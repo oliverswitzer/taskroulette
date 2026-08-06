@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import useSound from 'use-sound'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
-import { MOTIVATIONAL_MESSAGES } from '../constants'
-import EmailGateModal, { TR_EMAIL_KEY } from './EmailGateModal'
+import { MOTIVATIONAL_MESSAGES, TR_EMAIL_KEY } from '../constants'
+import EmailGateModal from './EmailGateModal'
 
 interface AllDoneScreenProps {
   completedCount: number
