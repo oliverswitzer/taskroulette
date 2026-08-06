@@ -52,6 +52,39 @@ export function sortTasksByDue(tasks: GoogleTask[]): GoogleTask[] {
   })
 }
 
+export interface GoogleTaskListGroup {
+  listId: string
+  listTitle: string
+  tasks: GoogleTask[]   // incomplete only, sorted soonest-due-first
+}
+
+/**
+ * Groups tasks by their Google list, excluding completed tasks, with each
+ * list's tasks sorted soonest-due-first (undated last). Lists preserve the
+ * order in which their first task appears. Lists whose tasks are all completed
+ * are omitted (nothing to show/import).
+ */
+export function groupTasksByList(tasks: GoogleTask[]): GoogleTaskListGroup[] {
+  const order: string[] = []
+  const byList = new Map<string, GoogleTaskListGroup>()
+
+  for (const task of tasks) {
+    if (task.status === 'completed') continue
+    let group = byList.get(task.listId)
+    if (!group) {
+      group = { listId: task.listId, listTitle: task.listTitle, tasks: [] }
+      byList.set(task.listId, group)
+      order.push(task.listId)
+    }
+    group.tasks.push(task)
+  }
+
+  return order.map(listId => {
+    const group = byList.get(listId)!
+    return { ...group, tasks: sortTasksByDue(group.tasks) }
+  })
+}
+
 export function filterDueSoon(tasks: GoogleTask[]): GoogleTask[] {
   return tasks.filter(t => {
     const b = getTaskBucket(t)
