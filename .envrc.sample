@@ -11,7 +11,3 @@ export GOOGLE_CLIENT_SECRET=""
 export VERCEL_TOKEN=***
 export VERCEL_ORG_ID=""
 export VERCEL_PROJECT_ID=""
-
-# Supabase (used by CI to run migrations)
-export SUPABASE_PROJECT_ID="kdkglemrnpxifnfgylvm"
-export SUPABASE_SERVICE_ROLE_KEY=***

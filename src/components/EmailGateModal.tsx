@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { submitEmail } from '../api'
-
-const TR_EMAIL_KEY = 'trEmail'
+import { TR_EMAIL_KEY } from '../constants'
 
 interface EmailGateModalProps {
   onSuccess: () => void   // called after email submitted — modal closes, user continues
@@ -191,5 +190,3 @@ export default function EmailGateModal({ onSuccess, onDismiss }: EmailGateModalP
     </AnimatePresence>
   )
 }
-
-export { TR_EMAIL_KEY }

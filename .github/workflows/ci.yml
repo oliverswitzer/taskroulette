@@ -41,26 +41,6 @@ jobs:
           VITE_SKIP_SESSION_LIMIT: true
 
       # Deploy to Vercel only on push to main, only if all tests passed
-      - name: Run Supabase migrations
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          # Run each migration file in order via Supabase Management API
-          for file in supabase/migrations/*.sql; do
-            echo "Running migration: $file"
-            SQL=$(cat "$file")
-            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X POST \
-              "https://api.supabase.com/v1/projects/${{ secrets.SUPABASE_PROJECT_ID }}/database/query" \
-              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"query\": $(echo "$SQL" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}")
-            if [ "$RESPONSE" != "200" ]; then
-              echo "Migration $file failed with HTTP $RESPONSE"
-              exit 1
-            fi
-            echo "Migration $file OK"
-          done
-
       - name: Deploy to Vercel
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: npx vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}

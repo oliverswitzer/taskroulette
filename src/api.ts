@@ -55,11 +55,14 @@ export async function recordSessionComplete(): Promise<void> {
   await fetch('/api/session-complete', { method: 'POST' }).catch(() => {})
 }
 
-export async function submitEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+export async function submitEmail(
+  email: string,
+  name?: { firstName?: string; lastName?: string },
+): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('/api/submit-email', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, firstName: name?.firstName, lastName: name?.lastName }),
   })
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string }

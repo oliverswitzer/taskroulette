@@ -3,6 +3,10 @@ export const MAX_TASKS = 15
 export const MAX_TASK_LENGTH = 80
 export const MAX_TASK_DISPLAY_LENGTH = 12 // chars on wheel slice before truncation
 
+// localStorage key marking the user has submitted an email (gate modal or Google OAuth) —
+// suppresses the email gate modal once set
+export const TR_EMAIL_KEY = 'trEmail'
+
 // Physics
 export const WHEEL_FRICTION = 0.016      // velocity decay per frame (time-corrected) — gives 4-5s spins
 export const MIN_VELOCITY = 0.0004       // rad/ms -- stop threshold
