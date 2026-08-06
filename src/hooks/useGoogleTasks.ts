@@ -11,6 +11,8 @@ import { useState, useEffect, useCallback } from 'react'
 import type { GoogleTask, GoogleAuthState } from '../types'
 import { sortTasksByDue } from '../googleTasks'
 import { supabase } from '../lib/supabase'
+import { submitEmail } from '../api'
+import { TR_EMAIL_KEY } from '../constants'
 
 const GOOGLE_TASKS_BASE = 'https://tasks.googleapis.com/tasks/v1'
 
@@ -20,6 +22,34 @@ interface GoogleTasksListResponse {
 }
 interface GoogleTaskListsResponse {
   items?: Array<{ id: string; title: string }>
+}
+
+// Google user_metadata on the Supabase session — full_name/given_name/family_name are
+// populated straight from the Google OAuth response, no extra API call needed.
+export interface GoogleUserMetadata {
+  full_name?: string
+  name?: string
+  given_name?: string
+  family_name?: string
+}
+
+export function splitName(meta: GoogleUserMetadata): { firstName?: string; lastName?: string } {
+  if (meta.given_name || meta.family_name) {
+    return { firstName: meta.given_name, lastName: meta.family_name }
+  }
+  const full = (meta.full_name ?? meta.name ?? '').trim()
+  if (!full) return {}
+  const [firstName, ...rest] = full.split(/\s+/)
+  return { firstName, lastName: rest.length ? rest.join(' ') : undefined }
+}
+
+// Fire-and-forget: submit the Google-verified email + name to Loops once per browser,
+// so the email gate never has to ask a user who already signed in with Google.
+export async function syncGoogleContactToLoops(email: string | undefined, meta: GoogleUserMetadata): Promise<void> {
+  if (!email || localStorage.getItem(TR_EMAIL_KEY)) return
+  const { firstName, lastName } = splitName(meta)
+  const result = await submitEmail(email, { firstName, lastName })
+  if (result.ok) localStorage.setItem(TR_EMAIL_KEY, email)
 }
 
 async function fetchAllGoogleTasks(accessToken: string): Promise<GoogleTask[]> {
@@ -102,6 +132,7 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
         if (window.location.hash || window.location.search.includes('code=')) {
           history.replaceState(history.state, '', window.location.pathname)
         }
+        void syncGoogleContactToLoops(session.user.email, session.user.user_metadata)
         fetchTasks(session.provider_token)
       } else if (!session) {
         setAuthState('idle')

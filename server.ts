@@ -55,6 +55,38 @@ function extractTasks(text: string): string[] {
   return JSON.parse(raw) as string[]
 }
 
+// ── Loops (shared by email-gate submit + Google OAuth callback) ─────────────
+
+type LoopsContact = { email: string; firstName?: string; lastName?: string }
+
+async function upsertLoopsContact(contact: LoopsContact): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const loopsKey = process.env['LOOPS_API_KEY']
+  if (!loopsKey) return { ok: false, error: 'Loops not configured', status: 500 }
+
+  const res = await fetch('https://app.loops.so/api/v1/contacts/create', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${loopsKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: contact.email,
+      ...(contact.firstName ? { firstName: contact.firstName } : {}),
+      ...(contact.lastName ? { lastName: contact.lastName } : {}),
+      source: 'taskreoulette-app',
+      userGroup: 'adhd-founder-builds',
+    }),
+  })
+
+  if (!res.ok && res.status !== 409) {
+    // 409 = already exists — that's fine, still treat as success
+    const text = await res.text()
+    console.error('Loops error:', res.status, text)
+    return { ok: false, error: 'Failed to subscribe', status: 502 }
+  }
+  return { ok: true }
+}
+
 export function createApp() {
   const currentApp = new Hono()
 
@@ -178,34 +210,20 @@ Rules:
     return c.json({ allowed, count: rec.count, limit, hasEmail: rec.hasEmail, reason })
   })
 
-  // Called when user submits email — adds to Loops, unlocks 3/day for IP
+  // Called when user submits email (gate modal) OR completes Google OAuth (frontend callback) —
+  // adds to Loops, unlocks 3/day for IP
   currentApp.post('/api/submit-email', async (c) => {
     try {
-      const body = await c.req.json<{ email: string }>()
+      const body = await c.req.json<{ email: string; firstName?: string; lastName?: string }>()
       if (!body.email?.trim()) return c.json({ error: 'email required' }, 400)
 
-      const loopsKey = process.env['LOOPS_API_KEY']
-      if (!loopsKey) return c.json({ error: 'Loops not configured' }, 500)
-
-      const res = await fetch('https://app.loops.so/api/v1/contacts/create', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${loopsKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: body.email.trim(),
-          source: 'taskreoulette-app',
-          userGroup: 'adhd-founder-builds',
-        }),
+      const result = await upsertLoopsContact({
+        email: body.email.trim(),
+        firstName: body.firstName?.trim() || undefined,
+        lastName: body.lastName?.trim() || undefined,
       })
 
-      if (!res.ok && res.status !== 409) {
-        // 409 = already exists — that's fine, still mark hasEmail
-        const text = await res.text()
-        console.error('Loops error:', res.status, text)
-        return c.json({ error: 'Failed to subscribe' }, 502)
-      }
+      if (!result.ok) return c.json({ error: result.error }, result.status as 500 | 502)
 
       // Mark IP as having submitted email — persists across daily resets
       const ip = getClientIp(c)
