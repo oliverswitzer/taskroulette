@@ -1,20 +1,15 @@
 /**
  * GoogleTasksSheet — bottom sheet for importing Google Tasks into the task list.
  *
- * Design: Enhanced bottom sheet (88% height), dot capacity meter, due-date grouped list.
- * Behavior: slides up over ListEditScreen with existing list peeking behind.
+ * Design: Enhanced bottom sheet (88% height), dot capacity meter, two-view nav.
+ * Behavior: slides up over ListEditScreen. First shows the user's Google task
+ * LISTS; tapping a list drills into its incomplete tasks, sorted soonest-due-first.
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { GoogleTask } from '../types'
 import { useGoogleTasks } from '../hooks/useGoogleTasks'
-import {
-  groupTasksByBucket,
-  BUCKET_ORDER,
-  BUCKET_LABEL,
-  filterDueSoon,
-  formatDueDate,
-} from '../googleTasks'
+import { groupTasksByList, formatDueDate } from '../googleTasks'
 import { MAX_TASKS } from '../constants'
 
 interface GoogleTasksSheetProps {
@@ -35,7 +30,7 @@ export default function GoogleTasksSheet({
 }: GoogleTasksSheetProps) {
   const { authState, tasks, isLoading, error, isMockMode, login, logout } = useGoogleTasks()
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [showAll, setShowAll] = useState(false)
+  const [selectedListId, setSelectedListId] = useState<string | null>(null)
 
   const slotsUsed = currentTaskCount + selected.size
   const slotsLeft = MAX_TASKS - slotsUsed
@@ -65,14 +60,15 @@ export default function GoogleTasksSheet({
 
   const handleClose = useCallback(() => {
     setSelected(new Set())
+    setSelectedListId(null)
     onClose()
   }, [onClose])
 
-  // Build task groups for display
-  const dueSoonTasks = filterDueSoon(tasks)
-  const displayTasks = showAll ? tasks : dueSoonTasks
-  const displayGrouped = groupTasksByBucket(displayTasks)
-  const hiddenCount = tasks.length - dueSoonTasks.length
+  // Group incomplete tasks by their Google list, sorted soonest-due-first.
+  const listGroups = useMemo(() => groupTasksByList(tasks), [tasks])
+  const selectedGroup = selectedListId
+    ? listGroups.find(g => g.listId === selectedListId) ?? null
+    : null
 
   return (
     <AnimatePresence>
@@ -170,43 +166,56 @@ export default function GoogleTasksSheet({
               )}
               {authState === 'authenticated' && (
                 <>
-                  {tasks.length === 0 ? (
+                  {listGroups.length === 0 ? (
                     <EmptyState onLogout={logout} />
+                  ) : selectedGroup === null ? (
+                    /* View 1 — list picker */
+                    <div data-testid="google-list-picker">
+                      {listGroups.map(group => (
+                        <ListPickerRow
+                          key={group.listId}
+                          listId={group.listId}
+                          listTitle={group.listTitle}
+                          taskCount={group.tasks.length}
+                          selectedCount={group.tasks.filter(t => selected.has(t.id)).length}
+                          onOpen={() => setSelectedListId(group.listId)}
+                        />
+                      ))}
+                    </div>
                   ) : (
-                    <>
-                      {BUCKET_ORDER.map(bucket => {
-                        const bucketTasks = displayGrouped.get(bucket) ?? []
-                        if (bucketTasks.length === 0) return null
-                        return (
-                          <BucketSection
-                            key={bucket}
-                            bucket={bucket}
-                            tasks={bucketTasks}
-                            selected={selected}
-                            onToggle={toggleTask}
-                            canSelectMore={canSelectMore}
-                          />
-                        )
-                      })}
-                      {!showAll && hiddenCount > 0 && (
-                        <button
-                          onClick={() => setShowAll(true)}
-                          style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: '14px 20px',
-                            background: 'none',
-                            border: 'none',
-                            color: 'oklch(72% 0.2 30)',
-                            fontSize: 14,
-                            cursor: 'pointer',
-                            textAlign: 'center',
-                          }}
-                        >
-                          Show {hiddenCount} more {hiddenCount === 1 ? 'task' : 'tasks'} →
-                        </button>
-                      )}
-                    </>
+                    /* View 2 — tasks within the selected list, soonest-due first */
+                    <div data-testid="google-task-list">
+                      <button
+                        onClick={() => setSelectedListId(null)}
+                        data-testid="google-list-back"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '12px 20px',
+                          background: 'none', border: 'none',
+                          color: 'oklch(72% 0.2 30)', fontSize: 14,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ← All lists
+                      </button>
+                      <div style={{
+                        padding: '0 20px 8px',
+                        fontSize: 11, fontWeight: 600,
+                        letterSpacing: '0.08em', textTransform: 'uppercase',
+                        color: 'oklch(50% 0.02 260)',
+                      }}>
+                        {selectedGroup.listTitle}
+                      </div>
+                      {selectedGroup.tasks.map(task => (
+                        <GoogleTaskRow
+                          key={task.id}
+                          task={task}
+                          isSelected={selected.has(task.id)}
+                          disabled={!canSelectMore && !selected.has(task.id)}
+                          onToggle={toggleTask}
+                        />
+                      ))}
+                    </div>
                   )}
                 </>
               )}
@@ -295,41 +304,56 @@ function CapacityMeter({ total, existing, selected }: { total: number; existing:
   )
 }
 
-function BucketSection({
-  bucket,
-  tasks,
-  selected,
-  onToggle,
-  canSelectMore,
+function ListPickerRow({
+  listTitle,
+  taskCount,
+  selectedCount,
+  onOpen,
 }: {
-  bucket: string
-  tasks: GoogleTask[]
-  selected: Set<string>
-  onToggle: (id: string) => void
-  canSelectMore: boolean
+  listId: string
+  listTitle: string
+  taskCount: number
+  selectedCount: number
+  onOpen: () => void
 }) {
   return (
-    <div>
-      <div style={{
-        padding: '12px 20px 4px',
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: bucket === 'overdue' ? 'oklch(60% 0.2 15)' : 'oklch(50% 0.02 260)',
-      }}>
-        {BUCKET_LABEL[bucket as keyof typeof BUCKET_LABEL]}
+    <motion.button
+      onClick={onOpen}
+      whileTap={{ scale: 0.98 }}
+      data-testid="google-list-row"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        padding: '16px 20px',
+        background: 'transparent',
+        border: 'none',
+        borderBottom: '1px solid oklch(24% 0.02 260)',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+    >
+      <div style={{ fontSize: 20, flexShrink: 0 }}>📋</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 15, fontWeight: 600,
+          color: 'oklch(92% 0.01 260)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {listTitle}
+        </div>
+        <div style={{ fontSize: 12, color: 'oklch(55% 0.02 260)', marginTop: 2 }}>
+          {taskCount} task{taskCount !== 1 ? 's' : ''}
+          {selectedCount > 0 && (
+            <span style={{ color: 'oklch(72% 0.2 30)', fontWeight: 600 }}>
+              {' · '}{selectedCount} selected
+            </span>
+          )}
+        </div>
       </div>
-      {tasks.map(task => (
-        <GoogleTaskRow
-          key={task.id}
-          task={task}
-          isSelected={selected.has(task.id)}
-          disabled={!canSelectMore && !selected.has(task.id)}
-          onToggle={onToggle}
-        />
-      ))}
-    </div>
+      <div style={{ fontSize: 18, color: 'oklch(50% 0.02 260)', flexShrink: 0 }}>›</div>
+    </motion.button>
   )
 }
 

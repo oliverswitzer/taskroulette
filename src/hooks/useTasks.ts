@@ -2,10 +2,7 @@ import { useState, useCallback } from 'react'
 import type { Task } from '../types'
 import { MAX_TASKS } from '../constants'
 import { saveTasks } from '../storage'
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-}
+import { generateId } from '../lib/id'
 
 export function useTasks(initialTasks: Task[] = []) {
   const [tasks, setTasks] = useState<Task[]>(initialTasks)

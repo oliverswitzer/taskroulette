@@ -25,6 +25,7 @@ import {
   clearAll,
 } from './storage'
 import { MAX_TASKS } from './constants'
+import { generateId } from './lib/id'
 
 // Expose state setters for Playwright testing
 declare global {
@@ -190,7 +191,7 @@ function App() {
   // ── LIST_EDIT task management ────────────────────────────────────────────────
   const handleAddTask = (text: string) => {
     const newTask: Task = {
-      id: String(Date.now()),
+      id: generateId(),
       text,
       position: tasks.length,
       completed: false,

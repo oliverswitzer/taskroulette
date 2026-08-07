@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getTaskBucket,
   groupTasksByBucket,
+  groupTasksByList,
   sortTasksByDue,
   filterDueSoon,
   formatDueDate,
@@ -98,6 +99,58 @@ describe('sortTasksByDue', () => {
   })
 })
 
+describe('groupTasksByList', () => {
+  it('groups incomplete tasks by list, sorted soonest-due-first within each list', () => {
+    const tasks: GoogleTask[] = [
+      makeTask({ id: 'a3', listId: 'work', listTitle: 'Work', due: '2024-06-20T00:00:00.000Z' }),
+      makeTask({ id: 'a1', listId: 'work', listTitle: 'Work', due: '2024-06-14T00:00:00.000Z' }),
+      makeTask({ id: 'b1', listId: 'home', listTitle: 'Home', due: '2024-06-16T00:00:00.000Z' }),
+      makeTask({ id: 'a2', listId: 'work', listTitle: 'Work' }), // no due -> last
+    ]
+    const groups = groupTasksByList(tasks)
+    expect(groups.map(g => g.listId)).toEqual(['work', 'home'])
+    const work = groups.find(g => g.listId === 'work')!
+    expect(work.listTitle).toBe('Work')
+    expect(work.tasks.map(t => t.id)).toEqual(['a1', 'a3', 'a2']) // soonest first, undated last
+    const home = groups.find(g => g.listId === 'home')!
+    expect(home.tasks.map(t => t.id)).toEqual(['b1'])
+  })
+
+  it('excludes completed tasks', () => {
+    const tasks: GoogleTask[] = [
+      makeTask({ id: 'done', listId: 'work', listTitle: 'Work', status: 'completed' }),
+      makeTask({ id: 'todo', listId: 'work', listTitle: 'Work', status: 'needsAction' }),
+    ]
+    const groups = groupTasksByList(tasks)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].tasks.map(t => t.id)).toEqual(['todo'])
+  })
+
+  it('omits lists whose tasks are all completed', () => {
+    const tasks: GoogleTask[] = [
+      makeTask({ id: 'd1', listId: 'archive', listTitle: 'Archive', status: 'completed' }),
+      makeTask({ id: 'd2', listId: 'archive', listTitle: 'Archive', status: 'completed' }),
+      makeTask({ id: 'live', listId: 'work', listTitle: 'Work', status: 'needsAction' }),
+    ]
+    const groups = groupTasksByList(tasks)
+    expect(groups.map(g => g.listId)).toEqual(['work'])
+  })
+
+  it('preserves list order by first appearance', () => {
+    const tasks: GoogleTask[] = [
+      makeTask({ id: 't1', listId: 'z', listTitle: 'Zeta' }),
+      makeTask({ id: 't2', listId: 'a', listTitle: 'Alpha' }),
+      makeTask({ id: 't3', listId: 'z', listTitle: 'Zeta' }),
+    ]
+    const groups = groupTasksByList(tasks)
+    expect(groups.map(g => g.listId)).toEqual(['z', 'a'])
+  })
+
+  it('returns an empty array for no tasks', () => {
+    expect(groupTasksByList([])).toEqual([])
+  })
+})
+
 describe('filterDueSoon', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -116,7 +169,6 @@ describe('filterDueSoon', () => {
     expect(filtered.map(t => t.id).sort()).toEqual(['overdue', 'today', 'week'])
   })
 })
-
 describe('formatDueDate', () => {
   beforeEach(() => {
     vi.useFakeTimers()
