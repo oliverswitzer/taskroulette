@@ -56,6 +56,16 @@ export default function EditModal({
     onClose()
   }, [onClose])
 
+  // Active tasks stay on top; completed tasks sink to the bottom.
+  // Stable sort — relative order within each group is preserved.
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (a.completed === b.completed) return 0
+    return a.completed ? 1 : -1
+  })
+
+  const activeCount = tasks.filter(t => !t.completed).length
+  const isWarning = activeCount >= MAX_TASKS - 1
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -140,18 +150,15 @@ export default function EditModal({
                 </h2>
                 <span
                   style={{
-                    background:
-                      tasks.length >= MAX_TASKS - 1
-                        ? 'oklch(25% 0.08 30)'
-                        : 'oklch(20% 0.05 30)',
-                    color:
-                      tasks.length >= MAX_TASKS - 1
-                        ? 'var(--color-accent-glow)'
-                        : 'var(--color-accent)',
-                    border:
-                      tasks.length >= MAX_TASKS - 1
-                        ? '1px solid oklch(40% 0.12 30)'
-                        : '1px solid oklch(35% 0.1 30)',
+                    background: isWarning
+                      ? 'oklch(25% 0.08 30)'
+                      : 'oklch(20% 0.05 30)',
+                    color: isWarning
+                      ? 'var(--color-accent-glow)'
+                      : 'var(--color-accent)',
+                    border: isWarning
+                      ? '1px solid oklch(40% 0.12 30)'
+                      : '1px solid oklch(35% 0.1 30)',
                     borderRadius: 'var(--rounded-full)',
                     padding: '4px 10px',
                     fontSize: '0.75rem',
@@ -159,7 +166,7 @@ export default function EditModal({
                     letterSpacing: '0.04em',
                   }}
                 >
-                  {tasks.length}/{MAX_TASKS}
+                  {activeCount}/{MAX_TASKS}
                 </span>
               </div>
 
@@ -173,7 +180,7 @@ export default function EditModal({
                 }}
               >
                 <AnimatePresence initial={false}>
-                  {tasks.map(taskItem => (
+                  {sortedTasks.map(taskItem => (
                     <motion.div
                       key={taskItem.id}
                       initial={{ opacity: 0, y: 8 }}
@@ -307,6 +314,8 @@ interface ModalTaskItemProps {
 function ModalTaskItem({ task, onEdit, onDelete }: ModalTaskItemProps) {
   return (
     <div
+      data-testid="edit-modal-task"
+      data-completed={task.completed ? 'true' : 'false'}
       style={{
         background: 'var(--color-surface2)',
         borderRadius: 'var(--rounded-md)',
@@ -322,7 +331,8 @@ function ModalTaskItem({ task, onEdit, onDelete }: ModalTaskItemProps) {
           flex: 1,
           fontSize: '0.9375rem',
           lineHeight: 1.5,
-          color: 'var(--color-ink)',
+          color: task.completed ? 'oklch(55% 0.015 260)' : 'var(--color-ink)',
+          textDecoration: task.completed ? 'line-through' : 'none',
           wordBreak: 'break-word',
         }}
       >

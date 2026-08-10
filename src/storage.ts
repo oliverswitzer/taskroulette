@@ -60,23 +60,6 @@ export function loadAppState(): AppState | null {
   }
 }
 
-export function saveCompletedCount(count: number): void {
-  try {
-    localStorage.setItem(KEYS.completedCount, String(count))
-  } catch {
-    /* ignore */
-  }
-}
-
-export function loadCompletedCount(): number {
-  try {
-    const raw = localStorage.getItem(KEYS.completedCount)
-    return raw ? parseInt(raw, 10) : 0
-  } catch {
-    return 0
-  }
-}
-
 export function saveSelectedTask(taskId: string | null, angle: number): void {
   try {
     if (taskId !== null) {
@@ -104,6 +87,9 @@ export function clearAll(): void {
   try {
     localStorage.removeItem(KEYS.tasks)
     localStorage.removeItem(KEYS.appState)
+    // Legacy key from when completedCount was tracked as a separate counter
+    // (now derived live from `tasks`) — still cleared so stale values from
+    // older sessions don't linger in localStorage.
     localStorage.removeItem(KEYS.completedCount)
     localStorage.removeItem(KEYS.selectedTaskId)
     localStorage.removeItem(KEYS.wheelAngle)

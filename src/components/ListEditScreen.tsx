@@ -26,7 +26,7 @@ export default function ListEditScreen({
   const [showAddForm, setShowAddForm] = useState(false)
   const [showGoogleSheet, setShowGoogleSheet] = useState(false)
 
-  const count = tasks.length
+  const count = tasks.filter(t => !t.completed).length
   const isWarning = count >= MAX_TASKS - 1
   const canProceed = count >= 1 && count <= MAX_TASKS
 
@@ -56,10 +56,11 @@ export default function ListEditScreen({
 
   const handleGoogleImport = useCallback(
     (googleTasks: Pick<GoogleTask, 'id' | 'title'>[]) => {
-      const slotsLeft = MAX_TASKS - tasks.length
+      const activeCount = tasks.filter(t => !t.completed).length
+      const slotsLeft = MAX_TASKS - activeCount
       googleTasks.slice(0, slotsLeft).forEach(t => onAddTask(t.title))
     },
-    [tasks.length, onAddTask]
+    [tasks, onAddTask]
   )
 
   return (
@@ -332,7 +333,7 @@ export default function ListEditScreen({
       <GoogleTasksSheet
         isOpen={showGoogleSheet}
         onClose={() => setShowGoogleSheet(false)}
-        currentTaskCount={tasks.length}
+        currentTaskCount={count}
         onImport={handleGoogleImport}
       />
 

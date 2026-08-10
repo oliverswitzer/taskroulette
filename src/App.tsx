@@ -18,8 +18,6 @@ import {
   loadTasks,
   saveAppState,
   loadAppState,
-  saveCompletedCount,
-  loadCompletedCount,
   saveSelectedTask,
   loadSelectedTask,
   clearAll,
@@ -63,7 +61,6 @@ function fileToBase64(file: File): Promise<string> {
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
-  const [completedCount, setCompletedCount] = useState<number>(() => loadCompletedCount())
   const [sessionLimitMsg, setSessionLimitMsg] = useState<string | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
 
@@ -111,11 +108,13 @@ function App() {
 
   // Active (non-completed) tasks
   const activeTasks = tasks.filter(t => !t.completed)
+  // Completed count is derived LIVE from tasks — never a separately-tracked
+  // counter, so deleting a completed task can never leave it stale.
+  const completedCount = tasks.filter(t => t.completed).length
 
   // Persist to localStorage on every relevant state change
   useEffect(() => { saveAppState(appState) }, [appState])
   useEffect(() => { saveTasks(tasks) }, [tasks])
-  useEffect(() => { saveCompletedCount(completedCount) }, [completedCount])
 
   // ── History management — back-button navigation ───────────────────────────
   const historyHandlers = {
@@ -133,7 +132,19 @@ function App() {
   useEffect(() => {
     window.__setAppState = (state: AppState) => setAppState(state)
     window.__setTasks = (t: Task[]) => setTasks(t)
-    window.__setCompletedCount = (count: number) => setCompletedCount(count)
+    // Compat shim for E2E tests: completedCount is now derived live from
+    // `tasks`, so "setting" it means seeding `tasks` with N completed dummy
+    // tasks rather than touching a separate counter.
+    window.__setCompletedCount = (count: number) => {
+      setTasks(
+        Array.from({ length: count }, (_, i) => ({
+          id: `__test-completed-${i}`,
+          text: `Test completed task ${i}`,
+          position: i,
+          completed: true,
+        }))
+      )
+    }
   }, [])
 
   // ── DUMP → PARSING ──────────────────────────────────────────────────────────
@@ -248,10 +259,6 @@ function App() {
     setTasks(updated)
     saveTasks(updated)
 
-    const newCount = completedCount + 1
-    setCompletedCount(newCount)
-    saveCompletedCount(newCount)
-
     const remaining = updated.filter(t => !t.completed)
     if (remaining.length === 0) {
       setSelectedTask(null)
@@ -327,7 +334,6 @@ function App() {
   const handleStartFresh = () => {
     clearAll()
     setTasks([])
-    setCompletedCount(0)
     setSelectedTask(null)
     setSelectedIndex(null)
     setDumpPhoto(null)
@@ -402,7 +408,7 @@ function App() {
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
               onProceed={handleProceed}
-              canAddMore={tasks.length < MAX_TASKS}
+              canAddMore={tasks.filter(t => !t.completed).length < MAX_TASKS}
             />
           </motion.div>
         )}
@@ -435,7 +441,7 @@ function App() {
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
               onClose={handleCloseEdit}
-              canAddMore={tasks.length < MAX_TASKS}
+              canAddMore={tasks.filter(t => !t.completed).length < MAX_TASKS}
             />
           </motion.div>
         )}
@@ -563,7 +569,6 @@ function App() {
                   setShowBackConfirm(false)
                   clearAll()
                   setTasks([])
-                  setCompletedCount(0)
                   setSelectedTask(null)
                   setSelectedIndex(null)
                   setDumpPhoto(null)
