@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — TaskRoulette</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      background: #0d0d12;
+      color: #e8e8ec;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+      line-height: 1.65;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 56px 24px 80px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 40px;
+      text-decoration: none;
+      color: #f5a623;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .brand img { width: 24px; height: 24px; }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .updated {
+      color: #9a9aa8;
+      font-size: 0.875rem;
+      margin: 0 0 40px;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 36px 0 12px;
+      color: #f5f5f8;
+    }
+    p, li { color: #c4c4cf; font-size: 0.9375rem; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    a { color: #f5a623; }
+    .back {
+      display: inline-block;
+      margin-top: 48px;
+      color: #9a9aa8;
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+    .back:hover { color: #e8e8ec; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/icon.svg" alt="" />
+      TaskRoulette
+    </a>
+
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: August 10, 2026</p>
+
+    <p>
+      TaskRoulette ("we", "the app") is a simple task-picking tool: you dump your
+      to-dos in, we sort them onto a spinning wheel, and it picks what you do next.
+      This page explains what data we touch and why.
+    </p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><strong>Your task text.</strong> Anything you type into the brain-dump box, or any photo of a
+        handwritten list you upload, is sent to Anthropic's API to be parsed into a task list. We don't
+        store this text on our servers — it lives in your browser's local storage only.</li>
+      <li><strong>Google Tasks (optional).</strong> If you choose to connect Google Tasks, we request
+        read-only access (<code>tasks.readonly</code>) via Google OAuth (handled by Supabase Auth) so you
+        can import existing tasks into TaskRoulette. We never write to, modify, or delete anything in your
+        Google Tasks account. We only read task titles and due dates to show you a picker.</li>
+      <li><strong>Email address (optional).</strong> If you sign in with Google or submit your email to keep
+        using the app past the free session limit, we store your email (and first/last name, if provided by
+        Google) in Loops, our email service provider, so we can send you occasional product updates. You can
+        ask us to delete this at any time (see Contact below).</li>
+      <li><strong>Basic usage counters.</strong> We track how many sessions you've completed today, keyed to
+        your IP address, purely to enforce a free-tier usage limit. This resets daily and isn't tied to any
+        other identifying information.</li>
+    </ul>
+
+    <h2>What we don't do</h2>
+    <ul>
+      <li>We don't sell your data.</li>
+      <li>We don't use your task content for anything other than parsing it into a list for you.</li>
+      <li>We don't share your Google account data with any third party except Anthropic (to parse text/photos
+        you submit) and Supabase (to handle the OAuth login flow itself).</li>
+    </ul>
+
+    <h2>Where your data lives</h2>
+    <p>
+      Your task list, wheel state, and completion history are stored in your browser's local storage — not
+      on our servers. Clearing your browser data or using a different device/browser will start you fresh.
+      Your email (if submitted) is stored in Loops. Your Google OAuth session is managed by Supabase Auth.
+    </p>
+
+    <h2>Third-party services we use</h2>
+    <ul>
+      <li><strong>Anthropic (Claude)</strong> — parses your brain-dump text/photos into a task list.</li>
+      <li><strong>Google Tasks API</strong> — read-only task import, only if you opt in.</li>
+      <li><strong>Supabase Auth</strong> — handles the Google OAuth login flow.</li>
+      <li><strong>Loops</strong> — email delivery for product updates, only if you submit your email.</li>
+      <li><strong>Vercel</strong> — hosting.</li>
+    </ul>
+
+    <h2>Your choices</h2>
+    <p>
+      You can disconnect Google Tasks access at any time from your
+      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google account permissions page</a>.
+      You can clear all locally stored task data from within the app, or by clearing your browser's site data
+      for taskroulette.vercel.app.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions or data-deletion requests: <a href="mailto:oliverswitzer@gmail.com">oliverswitzer@gmail.com</a>
+    </p>
+
+    <a class="back" href="/">&larr; Back to TaskRoulette</a>
+  </div>
+</body>
+</html>
