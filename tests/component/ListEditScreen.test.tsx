@@ -81,4 +81,15 @@ describe('ListEditScreen', () => {
     await user.click(screen.getByRole('button', { name: /spin/i }))
     expect(onProceed).toHaveBeenCalled()
   })
+
+  it("counter counts only active tasks, ignoring completed tasks in the array", () => {
+    const tasks: Task[] = [
+      ...makeTasks(2),
+      { id: 'c1', text: 'Completed 1', position: 2, completed: true },
+      { id: 'c2', text: 'Completed 2', position: 3, completed: true },
+    ]
+    render(<ListEditScreen {...defaultProps} tasks={tasks} />)
+    // Only 2 active tasks even though the array has 4 total entries.
+    expect(screen.getByText('2/15')).toBeInTheDocument()
+  })
 })
