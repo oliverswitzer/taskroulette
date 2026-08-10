@@ -126,3 +126,89 @@ test.describe('Wheel screen', () => {
     await expect(modal).not.toBeVisible()
   })
 })
+
+test.describe('Wheel slice click popover', () => {
+  test('clicking a slice while idle opens a popover with 3 options', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    // Click near the top of the wheel (inside the rim, above center) — lands
+    // in a slice since the wheel starts unrotated with slice 0 at 12 o'clock.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+
+    const popover = page.locator('[data-testid="slice-popover"]')
+    await expect(popover).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-set-active"]')).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-mark-complete"]')).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-delete"]')).toBeVisible()
+  })
+
+  test('popover dismisses when tapping outside', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await expect(page.locator('[data-testid="slice-popover"]')).toBeVisible()
+
+    // Click far outside the wheel/popover
+    await page.mouse.click(10, 10)
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+  })
+
+  test('"Set as active task" jumps straight to the task card, skipping the spin', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-set-active"]').click()
+
+    const taskCard = page.locator('[data-testid="task-card"]')
+    await expect(taskCard).toBeVisible({ timeout: 3000 })
+  })
+
+  test('"Mark as complete" removes the task from the wheel without opening the task card', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-mark-complete"]').click()
+
+    // Popover closes, wheel stays idle with one fewer task, no task card shown
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+    const remainingTasks = await page.evaluate(() => {
+      const raw = localStorage.getItem('tr-tasks')
+      return raw ? (JSON.parse(raw) as { completed: boolean }[]).filter(t => !t.completed).length : null
+    })
+    expect(remainingTasks).toBe(2)
+  })
+
+  test('"Delete" permanently removes the task', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-delete"]').click()
+
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+    const totalTasks = await page.evaluate(() => {
+      const raw = localStorage.getItem('tr-tasks')
+      return raw ? (JSON.parse(raw) as unknown[]).length : null
+    })
+    expect(totalTasks).toBe(2)
+  })
+
+  test('slice clicks are ignored while the wheel is spinning', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    await page.getByRole('button', { name: /spin/i }).click()
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+  })
+})

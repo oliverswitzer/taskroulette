@@ -1,7 +1,47 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DumpScreen from '../../src/components/DumpScreen'
+
+// Mock the Google Tasks hook so we can drive an "authenticated with tasks"
+// state without a real OAuth/Supabase round-trip.
+const mockUseGoogleTasks = vi.fn()
+vi.mock('../../src/hooks/useGoogleTasks', () => ({
+  useGoogleTasks: () => mockUseGoogleTasks(),
+}))
+
+function idleGoogleTasksState() {
+  return {
+    authState: 'idle' as const,
+    tasks: [],
+    isLoading: false,
+    error: null,
+    isMockMode: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refetch: vi.fn(),
+  }
+}
+
+function authenticatedGoogleTasksState() {
+  return {
+    authState: 'authenticated' as const,
+    tasks: [
+      { id: 'g1', title: 'Buy milk', listId: 'l1', listTitle: 'Errands', status: 'needsAction' as const },
+      { id: 'g2', title: 'Call dentist', listId: 'l1', listTitle: 'Errands', status: 'needsAction' as const },
+    ],
+    isLoading: false,
+    error: null,
+    isMockMode: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refetch: vi.fn(),
+  }
+}
+
+beforeEach(() => {
+  mockUseGoogleTasks.mockReturnValue(idleGoogleTasksState())
+})
 
 // Helper: render DumpScreen with the required new props (photoFile + onPhotoChange)
 function renderDump(overrides: Partial<React.ComponentProps<typeof DumpScreen>> = {}) {
@@ -82,5 +122,71 @@ describe('DumpScreen', () => {
     expect(placeholder.toLowerCase()).not.toBe('enter text')
     expect(placeholder.toLowerCase()).not.toBe('type here')
     expect(placeholder.length).toBeGreaterThan(20)
+  })
+
+  it('renders an "Add Google Tasks" button next to the photo attach button', () => {
+    mockUseGoogleTasks.mockReturnValue(authenticatedGoogleTasksState())
+    renderDump()
+    expect(screen.getByTestId('add-google-tasks-btn')).toBeInTheDocument()
+  })
+
+  it('clicking "Add Google Tasks" opens the Google Tasks sheet', async () => {
+    mockUseGoogleTasks.mockReturnValue(authenticatedGoogleTasksState())
+    const user = userEvent.setup()
+    renderDump()
+    expect(screen.queryByTestId('google-tasks-sheet')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('add-google-tasks-btn'))
+    expect(screen.getByTestId('google-tasks-sheet')).toBeInTheDocument()
+  })
+})
+
+describe('DumpScreen — Google Tasks freeform import', () => {
+  it('appends imported Google task titles as newline-separated text into the empty textarea', async () => {
+    mockUseGoogleTasks.mockReturnValue(authenticatedGoogleTasksState())
+    const user = userEvent.setup()
+    renderDump()
+
+    await user.click(screen.getByTestId('add-google-tasks-btn'))
+    await waitFor(() => expect(screen.getByTestId('google-list-picker')).toBeInTheDocument())
+    await user.click(screen.getByTestId('google-list-row'))
+    await waitFor(() => expect(screen.getByTestId('google-task-list')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('google-task-row-g1'))
+    await user.click(screen.getByTestId('google-task-row-g2'))
+    await user.click(screen.getByTestId('google-import-btn'))
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    await waitFor(() => expect(textarea.value).toBe('Buy milk\nCall dentist'))
+  })
+
+  it('appends with a newline separator when textarea already has content', async () => {
+    mockUseGoogleTasks.mockReturnValue(authenticatedGoogleTasksState())
+    const user = userEvent.setup()
+    renderDump()
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    await user.type(textarea, 'Existing task')
+
+    await user.click(screen.getByTestId('add-google-tasks-btn'))
+    await waitFor(() => expect(screen.getByTestId('google-list-picker')).toBeInTheDocument())
+    await user.click(screen.getByTestId('google-list-row'))
+    await waitFor(() => expect(screen.getByTestId('google-task-list')).toBeInTheDocument())
+    await user.click(screen.getByTestId('google-task-row-g1'))
+    await user.click(screen.getByTestId('google-import-btn'))
+
+    await waitFor(() => expect(textarea.value).toBe('Existing task\nBuy milk'))
+  })
+
+  it('closes the sheet after import without touching the textarea when the sheet is dismissed unused', async () => {
+    mockUseGoogleTasks.mockReturnValue(authenticatedGoogleTasksState())
+    const user = userEvent.setup()
+    renderDump()
+
+    await user.click(screen.getByTestId('add-google-tasks-btn'))
+    await waitFor(() => expect(screen.getByTestId('google-tasks-sheet')).toBeInTheDocument())
+    await user.click(screen.getByLabelText('Close'))
+
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement
+    expect(textarea.value).toBe('')
   })
 })

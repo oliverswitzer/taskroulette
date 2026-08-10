@@ -251,10 +251,13 @@ function App() {
   }
 
   // ── TASK_CARD → ALL_DONE or WHEEL_IDLE (complete) ──────────────────────────
-  const handleTaskComplete = () => {
-    if (!selectedTask) return
+  // Reusable completion logic — called by TaskCard's complete flow (via
+  // handleTaskComplete, using the currently selected task) AND by the wheel
+  // slice popover's "Mark as complete" option (via completeTaskById, using an
+  // arbitrary task id without going through the wheel-spin flow).
+  const completeTaskById = useCallback((taskId: string) => {
     const updated = tasks.map(t =>
-      t.id === selectedTask.id ? { ...t, completed: true } : t
+      t.id === taskId ? { ...t, completed: true } : t
     )
     setTasks(updated)
     saveTasks(updated)
@@ -312,7 +315,21 @@ function App() {
       saveSelectedTask(null, 0)
       setAppState('WHEEL_IDLE')
     }
+  }, [tasks, completedCount])
+
+  const handleTaskComplete = () => {
+    if (!selectedTask) return
+    completeTaskById(selectedTask.id)
   }
+
+  // ── WHEEL_IDLE → TASK_CARD (skip spin) — wheel slice popover "Set as active task" ──
+  const handleSetActiveTask = useCallback((task: Task, index: number) => {
+    setSelectedTask(task)
+    setSelectedIndex(index)
+    setWheelAngle(wheelAngle)
+    saveSelectedTask(task.id, wheelAngle)
+    setAppState('TASK_CARD')
+  }, [wheelAngle])
 
   // ── Back to dump (from anywhere mid-session) ────────────────────────────────
   const handleBackToDump = () => {
@@ -360,6 +377,9 @@ function App() {
         fontFamily: 'Inter, system-ui, sans-serif',
         display: 'flex',
         justifyContent: 'center',
+        // iOS notch/status-bar safe area — viewport-fit=cover in index.html
+        // makes env() resolve to the real inset on notched devices, 0 elsewhere.
+        paddingTop: 'env(safe-area-inset-top)',
       }}
     >
       <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: '100dvh' }}>
@@ -433,6 +453,9 @@ function App() {
               frozen={appState === 'TASK_CARD'}
               frozenAngle={wheelAngle}
               frozenWinnerIndex={selectedIndex}
+              onSetActiveTask={handleSetActiveTask}
+              onMarkComplete={completeTaskById}
+              onDeleteTask={handleDeleteTask}
             />
             <EditModal
               isOpen={isEditModalOpen}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import useSound from 'use-sound'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
 import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
@@ -18,6 +18,9 @@ interface WheelScreenProps {
   frozen?: boolean
   frozenAngle?: number
   frozenWinnerIndex?: number | null
+  onSetActiveTask?: (task: Task, index: number) => void
+  onMarkComplete?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void
 }
 
 
@@ -32,6 +35,9 @@ export default function WheelScreen({
   frozen = false,
   frozenAngle,
   frozenWinnerIndex,
+  onSetActiveTask,
+  onMarkComplete,
+  onDeleteTask,
 }: WheelScreenProps) {
   // Compute wheel size — cap at container width (480px max), not full viewport
   const [wheelSize, setWheelSize] = useState(() =>
@@ -162,6 +168,22 @@ export default function WheelScreen({
 
   const activeBadgeCount = tasks.filter(t => !t.completed).length
 
+  // ── Slice click popover — only interactive when wheel is idle ────────────
+  const [slicePopover, setSlicePopover] = useState<{ index: number; x: number; y: number } | null>(null)
+  const isWheelIdle = !isSpinning && !frozen
+
+  const handleSliceClick = useCallback(
+    (index: number, clientX: number, clientY: number) => {
+      if (!isWheelIdle) return
+      setSlicePopover({ index, x: clientX, y: clientY })
+    },
+    [isWheelIdle]
+  )
+
+  const closeSlicePopover = useCallback(() => setSlicePopover(null), [])
+
+  const popoverTask = slicePopover ? tasks[slicePopover.index] : undefined
+
   return (
     <div
       data-testid="wheel-screen"
@@ -284,8 +306,89 @@ export default function WheelScreen({
           winningIndex={frozen ? (frozenWinnerIndex ?? null) : physics.winningSliceIndex}
           size={wheelSize}
           tickerDeflection={tickerDeflection}
+          onSliceClick={isWheelIdle ? handleSliceClick : undefined}
         />
       </motion.div>
+
+      {/* Slice click popover — Set active / Mark complete / Delete */}
+      <AnimatePresence>
+        {slicePopover && popoverTask && (
+          <>
+            {/* Backdrop — dismiss on outside tap */}
+            <motion.div
+              key="slice-popover-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={closeSlicePopover}
+              style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'transparent' }}
+            />
+            <motion.div
+              key="slice-popover"
+              data-testid="slice-popover"
+              initial={{ opacity: 0, scale: 0.92, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -4 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+              style={{
+                position: 'fixed',
+                left: Math.min(Math.max(slicePopover.x, 100), window.innerWidth - 100),
+                top: Math.min(Math.max(slicePopover.y, 20), window.innerHeight - 160),
+                transform: 'translate(-50%, 0)',
+                zIndex: 61,
+                background: 'oklch(18% 0.025 260)',
+                border: '1px solid oklch(30% 0.025 260)',
+                borderRadius: 14,
+                padding: 6,
+                minWidth: 200,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div
+                style={{
+                  padding: '10px 12px 6px',
+                  fontSize: 12,
+                  color: 'oklch(55% 0.02 260)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {popoverTask.text}
+              </div>
+              <PopoverOption
+                testId="slice-popover-set-active"
+                label="Set as active task"
+                accent
+                onClick={() => {
+                  onSetActiveTask?.(popoverTask, slicePopover.index)
+                  closeSlicePopover()
+                }}
+              />
+              <PopoverOption
+                testId="slice-popover-mark-complete"
+                label="Mark as complete"
+                onClick={() => {
+                  onMarkComplete?.(popoverTask.id)
+                  closeSlicePopover()
+                }}
+              />
+              <PopoverOption
+                testId="slice-popover-delete"
+                label="Delete"
+                danger
+                onClick={() => {
+                  onDeleteTask?.(popoverTask.id)
+                  closeSlicePopover()
+                }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Spin button */}
       <div
@@ -323,6 +426,46 @@ export default function WheelScreen({
         </motion.button>
       </div>
     </div>
+  )
+}
+
+function PopoverOption({
+  testId,
+  label,
+  onClick,
+  accent,
+  danger,
+}: {
+  testId: string
+  label: string
+  onClick: () => void
+  accent?: boolean
+  danger?: boolean
+}) {
+  const color = danger ? 'oklch(65% 0.2 15)' : accent ? 'oklch(72% 0.2 30)' : 'oklch(90% 0.01 260)'
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 14,
+        fontWeight: accent ? 700 : 500,
+        color,
+        cursor: 'pointer',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'oklch(24% 0.02 260)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+    >
+      {label}
+    </button>
   )
 }
 
