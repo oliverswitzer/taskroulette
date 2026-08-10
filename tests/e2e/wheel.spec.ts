@@ -74,6 +74,39 @@ test.describe('Wheel screen', () => {
     await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 3000 })
   })
 
+  test('"skip for now" link stays within the mobile viewport when the task card is showing', async ({ page }) => {
+    test.setTimeout(15000)
+    // Regression test: WheelScreen used to reserve a hardcoded 300px for the
+    // task card and center the wheel in the remaining space, which drifted
+    // from the real card height (longer task text = taller card) and pushed
+    // the "skip for now" link off the bottom of the screen on real devices.
+    // The wheel's reserved bottom space is now driven by a ResizeObserver
+    // measuring the actual TaskCard height, so this must hold regardless of
+    // task text length.
+    await goToWheel(page, [
+      'A pretty long task title that will wrap onto two lines in the card',
+      'Another task',
+    ])
+    await page.getByRole('button', { name: /spin/i }).click()
+    const taskCard = page.locator('[data-testid="task-card"]')
+    await expect(taskCard).toBeVisible({ timeout: 10000 })
+
+    const skipBtn = page.locator('[data-testid="spin-again-btn"]')
+    await expect(skipBtn).toBeVisible({ timeout: 5000 })
+    // The task card slides in via a spring animation — wait for its transform
+    // to settle before reading pixel positions, otherwise this can flake by
+    // reading a mid-animation frame (spring damping/stiffness settle time).
+    await page.waitForTimeout(700)
+
+    const box = await skipBtn.boundingBox()
+    const viewport = page.viewportSize()
+    expect(box).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    // The button's full bounding box must fit inside the viewport height —
+    // not just be "attached" to the DOM off-screen.
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height)
+  })
+
   test('completing last task shows all-done screen', async ({ page }) => {
     test.setTimeout(30000)
     // Use 2 tasks so the wheel actually renders, then complete both
