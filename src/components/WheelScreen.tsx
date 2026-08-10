@@ -21,6 +21,12 @@ interface WheelScreenProps {
   onSetActiveTask?: (task: Task, index: number) => void
   onMarkComplete?: (taskId: string) => void
   onDeleteTask?: (taskId: string) => void
+  // Real measured height of the TaskCard bottom sheet (0 when not showing).
+  // Replaces a previous hardcoded 300px guess that drifted from the actual
+  // card height and either wasted vertical space or clipped the card's
+  // bottom content (e.g. the "skip for now" link) depending on task text
+  // length and device safe-area insets.
+  reservedBottomHeight?: number
 }
 
 
@@ -38,6 +44,7 @@ export default function WheelScreen({
   onSetActiveTask,
   onMarkComplete,
   onDeleteTask,
+  reservedBottomHeight = 0,
 }: WheelScreenProps) {
   // Compute wheel size — cap at container width (480px max), not full viewport
   const [wheelSize, setWheelSize] = useState(() =>
@@ -188,16 +195,25 @@ export default function WheelScreen({
     <div
       data-testid="wheel-screen"
       style={{
-        // In frozen mode: size to fit above the task card bottom sheet.
-        // 100svh = stable small viewport (excludes Safari address bar) so
-        // the wheel stays fully visible regardless of URL bar state.
-        // ~300px is the estimated task card height on mobile.
-        height: frozen ? 'calc(100svh - 300px)' : undefined,
+        // In frozen mode: size to fit exactly above the task card bottom
+        // sheet, using its REAL measured height (reservedBottomHeight) rather
+        // than a hardcoded guess. 100svh = stable small viewport (excludes
+        // Safari address bar) so the wheel stays fully visible regardless of
+        // URL bar state.
+        height: frozen ? `calc(100svh - ${reservedBottomHeight}px)` : undefined,
         minHeight: frozen ? undefined : '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: frozen ? 'center' : 'flex-start',
+        // Anchor content to the BOTTOM of the reserved area in frozen mode —
+        // i.e. hug the wheel right up against the task card with a small
+        // fixed gap, and let any true excess vertical space (on taller
+        // devices) collect ABOVE the wheel instead of between the wheel and
+        // the card. Previously this was centered, which split leftover space
+        // equally above AND below the wheel — pushing the task card (and its
+        // "skip for now" link) further down and off screen on shorter
+        // devices for no visual benefit.
+        justifyContent: frozen ? 'flex-end' : 'flex-start',
         padding: '0 20px',
         paddingBottom: frozen ? 0 : 32,
         paddingTop: frozen ? 0 : 0,
@@ -294,6 +310,10 @@ export default function WheelScreen({
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         style={{
           borderRadius: '50%',
+          // Small fixed gap below the wheel when frozen (task card showing) —
+          // enough to visually separate the wheel from the card without the
+          // large dead space the old centered layout produced.
+          marginBottom: frozen ? 20 : 0,
           boxShadow: (frozen || physics.winningSliceIndex !== null)
             ? '0 0 0 3px rgba(240,90,34,0.65), 0 0 55px rgba(240,90,34,0.4), 0 0 80px rgba(240,90,34,0.2)'
             : '0 8px 40px rgba(0,0,0,0.5)',

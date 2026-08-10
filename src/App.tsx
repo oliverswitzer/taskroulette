@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useHistoryNav } from './hooks/useHistoryNav'
 import { AnimatePresence, motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
@@ -61,6 +61,12 @@ function fileToBase64(file: File): Promise<string> {
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
+  // Measured (not guessed) height of the TaskCard bottom sheet, so the wheel's
+  // reserved bottom space always exactly matches the real card — no matter how
+  // short or long the active task's text is, or how big the device's safe-area
+  // insets are. Falls back to a reasonable default before the first measurement.
+  const [taskCardHeight, setTaskCardHeight] = useState(260)
+  const taskCardRef = useRef<HTMLDivElement>(null)
   const [sessionLimitMsg, setSessionLimitMsg] = useState<string | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
 
@@ -115,6 +121,21 @@ function App() {
   // Persist to localStorage on every relevant state change
   useEffect(() => { saveAppState(appState) }, [appState])
   useEffect(() => { saveTasks(tasks) }, [tasks])
+
+  // Measure the real TaskCard height whenever it's mounted/resizes (task text
+  // length, safe-area insets, and font rendering all affect the actual height —
+  // a hardcoded guess drifted from reality and either left a big dead gap above
+  // the card or clipped its bottom content like the "skip for now" link).
+  useEffect(() => {
+    const node = taskCardRef.current
+    if (!node) return
+    const observer = new ResizeObserver(entries => {
+      const height = entries[0]?.contentRect.height
+      if (height) setTaskCardHeight(height)
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [appState, selectedTask])
 
   // ── History management — back-button navigation ───────────────────────────
   const historyHandlers = {
@@ -453,6 +474,7 @@ function App() {
               frozen={appState === 'TASK_CARD'}
               frozenAngle={wheelAngle}
               frozenWinnerIndex={selectedIndex}
+              reservedBottomHeight={appState === 'TASK_CARD' ? taskCardHeight : 0}
               onSetActiveTask={handleSetActiveTask}
               onMarkComplete={completeTaskById}
               onDeleteTask={handleDeleteTask}
@@ -484,14 +506,16 @@ function App() {
               zIndex: 10,
             }}
           >
-            {selectedTask && (
-              <TaskCard
-                task={selectedTask}
-                onComplete={handleTaskComplete}
-                onSkip={handleSkip}
-                onBackToDump={handleBackToDump}
-              />
-            )}
+            <div ref={taskCardRef}>
+              {selectedTask && (
+                <TaskCard
+                  task={selectedTask}
+                  onComplete={handleTaskComplete}
+                  onSkip={handleSkip}
+                  onBackToDump={handleBackToDump}
+                />
+              )}
+            </div>
           </motion.div>
         )}
 
