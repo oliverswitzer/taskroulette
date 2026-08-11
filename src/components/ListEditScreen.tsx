@@ -70,18 +70,22 @@ export default function ListEditScreen({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       style={{
-        minHeight: '100dvh',
+        // Fixed to the viewport height (not just minHeight) — the page/window
+        // itself must never scroll. The task list below has its own internal
+        // scroll region so all tasks stay reachable without moving the page.
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'column',
-        padding: '48px 20px calc(80px + 32px)',
+        padding: '48px 20px 0',
         boxSizing: 'border-box',
         maxWidth: 600,
         margin: '0 auto',
         width: '100%',
+        overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div style={{ marginBottom: 32 }}>
+      {/* Header — fixed within the flex column, never scrolls */}
+      <div style={{ marginBottom: 32, flexShrink: 0 }}>
         <div
           style={{
             display: 'flex',
@@ -134,14 +138,20 @@ export default function ListEditScreen({
         </p>
       </div>
 
-      {/* Task list — P0-2: paddingBottom so CTA doesn't obscure last item */}
+      {/* Task list — internal scroll region ONLY. This is what makes all
+          tasks reachable without the page/window itself ever scrolling —
+          overflowY:auto is scoped to just this box, bounded by the fixed
+          header above and fixed CTA below. */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
           flex: 1,
-          paddingBottom: 'calc(80px + 32px)',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          paddingBottom: 16,
+          minHeight: 0,
         }}
       >
         <AnimatePresence initial>
@@ -289,16 +299,19 @@ export default function ListEditScreen({
         )}
       </div>
 
-      {/* Proceed CTA — fixed bottom */}
+      {/* Proceed CTA — a normal flex child (NOT position:fixed). Fixed
+          positioning floated this bar OVER whatever list content happened
+          to be at the bottom of the viewport at scrollTop=0 — the list's
+          paddingBottom only extended scroll range, it didn't stop the
+          overlay from visually covering unscrolled items (edit/delete
+          icons on the last visible task got clipped under the button).
+          As a real flex-column sibling with flexShrink:0, it reserves its
+          own space and the list naturally ends above it. */}
       <div
         style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          flexShrink: 0,
           padding: '16px 20px 32px',
-          background:
-            'linear-gradient(to top, var(--color-base) 70%, transparent)',
+          background: 'var(--color-base)',
           display: 'flex',
           justifyContent: 'center',
         }}
