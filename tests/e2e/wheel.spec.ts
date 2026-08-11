@@ -74,6 +74,39 @@ test.describe('Wheel screen', () => {
     await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 3000 })
   })
 
+  test('"skip for now" link stays within the mobile viewport when the task card is showing', async ({ page }) => {
+    test.setTimeout(15000)
+    // Regression test: WheelScreen used to reserve a hardcoded 300px for the
+    // task card and center the wheel in the remaining space, which drifted
+    // from the real card height (longer task text = taller card) and pushed
+    // the "skip for now" link off the bottom of the screen on real devices.
+    // The wheel's reserved bottom space is now driven by a ResizeObserver
+    // measuring the actual TaskCard height, so this must hold regardless of
+    // task text length.
+    await goToWheel(page, [
+      'A pretty long task title that will wrap onto two lines in the card',
+      'Another task',
+    ])
+    await page.getByRole('button', { name: /spin/i }).click()
+    const taskCard = page.locator('[data-testid="task-card"]')
+    await expect(taskCard).toBeVisible({ timeout: 10000 })
+
+    const skipBtn = page.locator('[data-testid="spin-again-btn"]')
+    await expect(skipBtn).toBeVisible({ timeout: 5000 })
+    // The task card slides in via a spring animation — wait for its transform
+    // to settle before reading pixel positions, otherwise this can flake by
+    // reading a mid-animation frame (spring damping/stiffness settle time).
+    await page.waitForTimeout(700)
+
+    const box = await skipBtn.boundingBox()
+    const viewport = page.viewportSize()
+    expect(box).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    // The button's full bounding box must fit inside the viewport height —
+    // not just be "attached" to the DOM off-screen.
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height)
+  })
+
   test('completing last task shows all-done screen', async ({ page }) => {
     test.setTimeout(30000)
     // Use 2 tasks so the wheel actually renders, then complete both
@@ -124,5 +157,122 @@ test.describe('Wheel screen', () => {
     const doneBtn = page.getByRole('button', { name: /done/i })
     await doneBtn.click()
     await expect(modal).not.toBeVisible()
+  })
+})
+
+test.describe('Wheel slice click popover', () => {
+  test('clicking a slice while idle opens a popover with 3 options', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    // Click near the top of the wheel (inside the rim, above center) — lands
+    // in a slice since the wheel starts unrotated with slice 0 at 12 o'clock.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+
+    const popover = page.locator('[data-testid="slice-popover"]')
+    await expect(popover).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-set-active"]')).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-mark-complete"]')).toBeVisible()
+    await expect(page.locator('[data-testid="slice-popover-delete"]')).toBeVisible()
+  })
+
+  test('popover dismisses when tapping outside', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await expect(page.locator('[data-testid="slice-popover"]')).toBeVisible()
+
+    // Click far outside the wheel/popover
+    await page.mouse.click(10, 10)
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+  })
+
+  test('popover stays fully within the viewport when clicking a slice on the right side', async ({ page }) => {
+    // Regression test: framer-motion's own `transform` (driven by the
+    // popover's initial/animate scale+y values) silently overwrote a CSS
+    // `transform: translate(-50%, 0)` that was being used to center the
+    // popover horizontally on the click point. The clamp math looked
+    // correct on paper but the actual rendered position ignored the -50%
+    // shift entirely, so clicking a slice on the right half of the wheel
+    // (any x position, but especially with a long task name) rendered the
+    // popover clipped off the right edge on mobile viewports.
+    await goToWheel(page, [
+      'Set up Oddly Good profile on Postiz',
+      'Create Postiz app account',
+    ])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    // Right side of the wheel, roughly mid-height
+    await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.55)
+
+    const popover = page.locator('[data-testid="slice-popover"]')
+    await expect(popover).toBeVisible({ timeout: 3000 })
+    await page.waitForTimeout(400) // let the spring animation settle
+
+    const popoverBox = await popover.boundingBox()
+    const viewport = page.viewportSize()
+    expect(popoverBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    expect(popoverBox!.x).toBeGreaterThanOrEqual(0)
+    expect(popoverBox!.x + popoverBox!.width).toBeLessThanOrEqual(viewport!.width)
+  })
+
+  test('"Set as active task" jumps straight to the task card, skipping the spin', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-set-active"]').click()
+
+    const taskCard = page.locator('[data-testid="task-card"]')
+    await expect(taskCard).toBeVisible({ timeout: 3000 })
+  })
+
+  test('"Mark as complete" removes the task from the wheel without opening the task card', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-mark-complete"]').click()
+
+    // Popover closes, wheel stays idle with one fewer task, no task card shown
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+    const remainingTasks = await page.evaluate(() => {
+      const raw = localStorage.getItem('tr-tasks')
+      return raw ? (JSON.parse(raw) as { completed: boolean }[]).filter(t => !t.completed).length : null
+    })
+    expect(remainingTasks).toBe(2)
+  })
+
+  test('"Delete" permanently removes the task', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await page.locator('[data-testid="slice-popover-delete"]').click()
+
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+    const totalTasks = await page.evaluate(() => {
+      const raw = localStorage.getItem('tr-tasks')
+      return raw ? (JSON.parse(raw) as unknown[]).length : null
+    })
+    expect(totalTasks).toBe(2)
+  })
+
+  test('slice clicks are ignored while the wheel is spinning', async ({ page }) => {
+    await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
+    await page.getByRole('button', { name: /spin/i }).click()
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.25)
+    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
   })
 })

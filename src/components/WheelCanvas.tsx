@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Task } from '../types'
+import { hitTestSlice } from '../lib/wheelHitTest'
 
 // Precomputed hex equivalents of OKLCH wheel colors for canvas
 // (OKLCH does NOT work in canvas 2D fillStyle directly)
@@ -34,9 +35,10 @@ interface WheelCanvasProps {
   winningIndex: number | null
   size: number
   tickerDeflection?: number // 0–1, how much the ticker is deflected (bounces on peg hit)
+  onSliceClick?: (index: number, clientX: number, clientY: number) => void
 }
 
-export default function WheelCanvas({ tasks, angle, winningIndex, size, tickerDeflection = 0 }: WheelCanvasProps) {
+export default function WheelCanvas({ tasks, angle, winningIndex, size, tickerDeflection = 0, onSliceClick }: WheelCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -294,11 +296,27 @@ export default function WheelCanvas({ tasks, angle, winningIndex, size, tickerDe
   // tickerDeflection: 0 = upright, 1 = fully deflected right (15deg)
   const deflectDeg = tickerDeflection * 15
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!onSliceClick || tasks.length === 0) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const cx = rect.width / 2
+    const cy = rect.height / 2
+    const dx = e.clientX - rect.left - cx
+    const dy = e.clientY - rect.top - cy
+    const rimWidth = Math.max(10, size * 0.055)
+    const radius = size / 2 - rimWidth - 2
+    const index = hitTestSlice(dx, dy, radius, tasks.length, angle)
+    if (index !== null) onSliceClick(index, e.clientX, e.clientY)
+  }
+
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <canvas
         ref={canvasRef}
-        style={{ display: 'block', borderRadius: '50%' }}
+        onClick={handleCanvasClick}
+        style={{ display: 'block', borderRadius: '50%', cursor: onSliceClick ? 'pointer' : undefined }}
         aria-label="Task roulette wheel"
       />
       {/* Ticker pointer — sits outside canvas, pivots at top */}

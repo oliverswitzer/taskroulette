@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import useSound from 'use-sound'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Task } from '../types'
 import { useWheelPhysics } from '../hooks/useWheelPhysics'
 import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
+
+// Fixed width for the slice-click popover. Needs to be a real fixed value
+// (not min-width) so both the header-text truncation and the on-screen
+// clamp math have a single consistent number to work with.
+const POPOVER_WIDTH = 220
 
 interface WheelScreenProps {
   tasks: Task[]
@@ -18,6 +23,15 @@ interface WheelScreenProps {
   frozen?: boolean
   frozenAngle?: number
   frozenWinnerIndex?: number | null
+  onSetActiveTask?: (task: Task, index: number) => void
+  onMarkComplete?: (taskId: string) => void
+  onDeleteTask?: (taskId: string) => void
+  // Real measured height of the TaskCard bottom sheet (0 when not showing).
+  // Replaces a previous hardcoded 300px guess that drifted from the actual
+  // card height and either wasted vertical space or clipped the card's
+  // bottom content (e.g. the "skip for now" link) depending on task text
+  // length and device safe-area insets.
+  reservedBottomHeight?: number
 }
 
 
@@ -32,6 +46,10 @@ export default function WheelScreen({
   frozen = false,
   frozenAngle,
   frozenWinnerIndex,
+  onSetActiveTask,
+  onMarkComplete,
+  onDeleteTask,
+  reservedBottomHeight = 0,
 }: WheelScreenProps) {
   // Compute wheel size — cap at container width (480px max), not full viewport
   const [wheelSize, setWheelSize] = useState(() =>
@@ -162,20 +180,45 @@ export default function WheelScreen({
 
   const activeBadgeCount = tasks.filter(t => !t.completed).length
 
+  // ── Slice click popover — only interactive when wheel is idle ────────────
+  const [slicePopover, setSlicePopover] = useState<{ index: number; x: number; y: number } | null>(null)
+  const isWheelIdle = !isSpinning && !frozen
+
+  const handleSliceClick = useCallback(
+    (index: number, clientX: number, clientY: number) => {
+      if (!isWheelIdle) return
+      setSlicePopover({ index, x: clientX, y: clientY })
+    },
+    [isWheelIdle]
+  )
+
+  const closeSlicePopover = useCallback(() => setSlicePopover(null), [])
+
+  const popoverTask = slicePopover ? tasks[slicePopover.index] : undefined
+
   return (
     <div
       data-testid="wheel-screen"
       style={{
-        // In frozen mode: size to fit above the task card bottom sheet.
-        // 100svh = stable small viewport (excludes Safari address bar) so
-        // the wheel stays fully visible regardless of URL bar state.
-        // ~300px is the estimated task card height on mobile.
-        height: frozen ? 'calc(100svh - 300px)' : undefined,
+        // In frozen mode: size to fit exactly above the task card bottom
+        // sheet, using its REAL measured height (reservedBottomHeight) rather
+        // than a hardcoded guess. 100svh = stable small viewport (excludes
+        // Safari address bar) so the wheel stays fully visible regardless of
+        // URL bar state.
+        height: frozen ? `calc(100svh - ${reservedBottomHeight}px)` : undefined,
         minHeight: frozen ? undefined : '100dvh',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: frozen ? 'center' : 'flex-start',
+        // Anchor content to the BOTTOM of the reserved area in frozen mode —
+        // i.e. hug the wheel right up against the task card with a small
+        // fixed gap, and let any true excess vertical space (on taller
+        // devices) collect ABOVE the wheel instead of between the wheel and
+        // the card. Previously this was centered, which split leftover space
+        // equally above AND below the wheel — pushing the task card (and its
+        // "skip for now" link) further down and off screen on shorter
+        // devices for no visual benefit.
+        justifyContent: frozen ? 'flex-end' : 'flex-start',
         padding: '0 20px',
         paddingBottom: frozen ? 0 : 32,
         paddingTop: frozen ? 0 : 0,
@@ -272,6 +315,10 @@ export default function WheelScreen({
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         style={{
           borderRadius: '50%',
+          // Small fixed gap below the wheel when frozen (task card showing) —
+          // enough to visually separate the wheel from the card without the
+          // large dead space the old centered layout produced.
+          marginBottom: frozen ? 20 : 0,
           boxShadow: (frozen || physics.winningSliceIndex !== null)
             ? '0 0 0 3px rgba(240,90,34,0.65), 0 0 55px rgba(240,90,34,0.4), 0 0 80px rgba(240,90,34,0.2)'
             : '0 8px 40px rgba(0,0,0,0.5)',
@@ -284,8 +331,104 @@ export default function WheelScreen({
           winningIndex={frozen ? (frozenWinnerIndex ?? null) : physics.winningSliceIndex}
           size={wheelSize}
           tickerDeflection={tickerDeflection}
+          onSliceClick={isWheelIdle ? handleSliceClick : undefined}
         />
       </motion.div>
+
+      {/* Slice click popover — Set active / Mark complete / Delete */}
+      <AnimatePresence>
+        {slicePopover && popoverTask && (
+          <>
+            {/* Backdrop — dismiss on outside tap */}
+            <motion.div
+              key="slice-popover-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={closeSlicePopover}
+              style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'transparent' }}
+            />
+            <motion.div
+              key="slice-popover"
+              data-testid="slice-popover"
+              initial={{ opacity: 0, scale: 0.92, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -4 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+              style={{
+                position: 'fixed',
+                // Fixed width (not just minWidth) so the header text's
+                // whiteSpace:nowrap + ellipsis truncation actually has
+                // something to truncate against — without a max width, a
+                // long task name stretched the popover wider than the
+                // clamp math assumed, pushing it off the right edge on
+                // mobile ("Create Postiz app account" bug).
+                width: POPOVER_WIDTH,
+                // Left edge computed directly (not centered via CSS
+                // transform) — framer-motion drives its own `transform`
+                // from the animate/initial scale+y values and silently
+                // overwrites any translate(-50%) set via the style prop,
+                // which is what broke the on-screen clamping here: the
+                // math looked centered but the actual rendered position
+                // ignored the -50% shift entirely.
+                left: Math.min(
+                  Math.max(slicePopover.x - POPOVER_WIDTH / 2, 8),
+                  window.innerWidth - POPOVER_WIDTH - 8
+                ),
+                top: Math.min(Math.max(slicePopover.y, 20), window.innerHeight - 160),
+                zIndex: 61,
+                background: 'oklch(18% 0.025 260)',
+                border: '1px solid oklch(30% 0.025 260)',
+                borderRadius: 14,
+                padding: 6,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div
+                style={{
+                  padding: '10px 12px 6px',
+                  fontSize: 12,
+                  color: 'oklch(55% 0.02 260)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {popoverTask.text}
+              </div>
+              <PopoverOption
+                testId="slice-popover-set-active"
+                label="Set as active task"
+                accent
+                onClick={() => {
+                  onSetActiveTask?.(popoverTask, slicePopover.index)
+                  closeSlicePopover()
+                }}
+              />
+              <PopoverOption
+                testId="slice-popover-mark-complete"
+                label="Mark as complete"
+                onClick={() => {
+                  onMarkComplete?.(popoverTask.id)
+                  closeSlicePopover()
+                }}
+              />
+              <PopoverOption
+                testId="slice-popover-delete"
+                label="Delete"
+                danger
+                onClick={() => {
+                  onDeleteTask?.(popoverTask.id)
+                  closeSlicePopover()
+                }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Spin button */}
       <div
@@ -323,6 +466,46 @@ export default function WheelScreen({
         </motion.button>
       </div>
     </div>
+  )
+}
+
+function PopoverOption({
+  testId,
+  label,
+  onClick,
+  accent,
+  danger,
+}: {
+  testId: string
+  label: string
+  onClick: () => void
+  accent?: boolean
+  danger?: boolean
+}) {
+  const color = danger ? 'oklch(65% 0.2 15)' : accent ? 'oklch(72% 0.2 30)' : 'oklch(90% 0.01 260)'
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        background: 'transparent',
+        border: 'none',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 14,
+        fontWeight: accent ? 700 : 500,
+        color,
+        cursor: 'pointer',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'oklch(24% 0.02 260)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+    >
+      {label}
+    </button>
   )
 }
 
