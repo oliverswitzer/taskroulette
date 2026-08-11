@@ -22,8 +22,51 @@ function setAppHeightVar() {
   document.documentElement.style.setProperty('--app-height', `${height}px`)
 }
 
+// Detects iOS home-screen/standalone PWA mode. `navigator.standalone` is
+// the iOS-specific flag (non-standard, Safari-only); the media query is
+// the cross-browser standard equivalent, kept as a fallback.
+function isStandalone(): boolean {
+  return (
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches
+  )
+}
+
+// Standalone/home-screen mode has SEPARATE, still-open WebKit bugs beyond
+// #153852 (which only covers regular Safari tabs) — bugs.webkit.org
+// #222654 ("Scrolling in home screen apps incorrectly latches to
+// document") and #236561 both cause `overflow: hidden` on html/body to
+// remain unreliable specifically when a site is added to the home screen,
+// even after #153852 was fixed for the regular-tab case. This is a
+// distinct, still-reproducing bug class from the dvh/svh timing issue
+// fixed above — confirmed via a live report: identical layout worked
+// correctly in a normal Safari tab but still scrolled/clipped once added
+// to the home screen.
+//
+// The standard, widely-documented workaround for standalone mode
+// specifically is the classic iOS body-scroll-lock technique:
+// `position: fixed` on body pinned to (0,0) at the real measured height.
+// This is intentionally scoped to standalone mode ONLY — applying it
+// broadly would break iOS's automatic scroll-into-view when the on-screen
+// keyboard opens (needed for the dump textarea) in a normal browser tab,
+// which is exactly why this project avoided position:fixed globally
+// before. Standalone mode's keyboard handling already works differently
+// (visualViewport resizes the fixed layout correctly), so this is safe to
+// scope this way.
+function applyStandaloneScrollLock() {
+  if (!isStandalone()) return
+  const body = document.body
+  body.style.position = 'fixed'
+  body.style.top = '0'
+  body.style.left = '0'
+  body.style.width = '100%'
+  body.style.height = 'var(--app-height)'
+  body.style.overflow = 'hidden'
+}
+
 export function initViewportHeightFix() {
   setAppHeightVar()
+  applyStandaloneScrollLock()
   window.addEventListener('resize', setAppHeightVar)
   window.addEventListener('orientationchange', setAppHeightVar)
   if (window.visualViewport) {

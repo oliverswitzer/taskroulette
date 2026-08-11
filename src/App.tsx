@@ -401,6 +401,18 @@ function App() {
         // iOS notch/status-bar safe area — viewport-fit=cover in index.html
         // makes env() resolve to the real inset on notched devices, 0 elsewhere.
         paddingTop: 'env(safe-area-inset-top)',
+        // Home-indicator safe area — was previously only handled by 2
+        // individual modals, not the app shell itself. In a REGULAR Safari
+        // tab this is usually 0px (Safari's own chrome occupies that
+        // space), but this app runs with manifest display:'standalone'
+        // (added to the home screen), where safe-area-inset-bottom becomes
+        // a REAL non-zero value (~34px home indicator) since there's no
+        // browser chrome left to absorb it. Every screen's layout is sized
+        // tightly against --app-height with no slack, so this missing
+        // padding is exactly what clipped bottom content/text specifically
+        // in home-screen/standalone mode (not in a regular Safari tab).
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        boxSizing: 'border-box',
       }}
     >
       <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: 'var(--app-height, 100vh)' }}>
