@@ -1,4 +1,5 @@
 import { test } from '@playwright/test'
+import { waitForBoundingBoxToSettle } from './helpers'
 
 test('screenshot wheel explosion confetti', async ({ page }) => {
   // Start on TaskCard with 1 task left — checking it triggers the explosion
@@ -12,7 +13,10 @@ test('screenshot wheel explosion confetti', async ({ page }) => {
   })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('[data-testid="task-card"]', { timeout: 8000 })
-  await page.waitForTimeout(400)
+  // Wait for the task card's slide-in spring animation to settle (bounding
+  // box stops moving) instead of a fixed sleep — this is a screenshot
+  // capture script, but still benefits from not racing the animation.
+  await waitForBoundingBoxToSettle(page.locator('[data-testid="task-card"]'), { axis: 'y' })
 
   // Click checkbox — explosion fires, screen starts transitioning
   await page.click('[data-testid="task-checkbox"]')

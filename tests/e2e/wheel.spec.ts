@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { waitForBoundingBoxToSettle } from './helpers'
 
 // Helper: get app to WHEEL_IDLE state with N tasks via window helpers
 async function goToWheel(page: Page, taskTexts: string[]) {
@@ -93,10 +94,10 @@ test.describe('Wheel screen', () => {
 
     const skipBtn = page.locator('[data-testid="spin-again-btn"]')
     await expect(skipBtn).toBeVisible({ timeout: 5000 })
-    // The task card slides in via a spring animation — wait for its transform
-    // to settle before reading pixel positions, otherwise this can flake by
-    // reading a mid-animation frame (spring damping/stiffness settle time).
-    await page.waitForTimeout(700)
+    // Wait for the task card's slide-in spring animation to actually finish
+    // (bounding box stops moving) instead of a fixed sleep — this doesn't
+    // flake by reading a mid-animation frame under CPU contention.
+    await waitForBoundingBoxToSettle(skipBtn, { axis: 'y' })
 
     const box = await skipBtn.boundingBox()
     const viewport = page.viewportSize()
@@ -211,7 +212,11 @@ test.describe('Wheel slice click popover', () => {
 
     const popover = page.locator('[data-testid="slice-popover"]')
     await expect(popover).toBeVisible({ timeout: 3000 })
-    await page.waitForTimeout(400) // let the spring animation settle
+    // Wait for the popover's spring-in animation to settle (bounding box
+    // Wait for the popover's spring-in animation to actually finish
+    // (bounding box stops moving) instead of a fixed sleep — this doesn't
+    // flake under CPU contention.
+    await waitForBoundingBoxToSettle(popover, { axis: 'x' })
 
     const popoverBox = await popover.boundingBox()
     const viewport = page.viewportSize()

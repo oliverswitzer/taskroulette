@@ -29,8 +29,8 @@ test.describe('Full state machine', () => {
       window.__setAppState('ALL_DONE')
       ;(window as Window & typeof globalThis & { __setCompletedCount?: (n: number) => void }).__setCompletedCount?.(3)
     })
-    // Small wait for React to re-render after state mutation
-    await page.waitForTimeout(300)
+    // React re-render after the direct state mutation above is picked up
+    // by expect's own polling/retry — no fixed wait needed.
     const allDone = page.locator('[data-testid="all-done-screen"]')
     await expect(allDone).toBeVisible({ timeout: 5000 })
     const startFresh = page.getByRole('button', { name: /task dump|spin again/i })

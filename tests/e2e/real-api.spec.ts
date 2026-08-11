@@ -84,14 +84,47 @@ test.describe('Real API — text parse', () => {
 
       await page.screenshot({ path: `tests/e2e/screenshots/real-api-task-card-${i}.png` })
 
-      // Check it off and wait for confetti + transition (800ms anim)
+      // Capture the task text before checking off — used below to detect
+      // whether the app auto-advanced straight to another task card (last
+      // task removed → new task card mounted) vs. returned to the wheel.
+      const taskTextBefore = await page.locator('[data-testid="task-card"]').innerText()
+
+      // Check it off. Previously this used a flat waitForTimeout(1500) to
+      // "wait for confetti + transition", which raced the real DOM: on a
+      // slow CI run the OLD checkbox element gets detached (task-card
+      // re-renders/unmounts) WHILE the timeout is still counting down, so
+      // the very next `checkbox.click()` below (re-querying the same
+      // locator) could land mid-transition and throw "element was detached
+      // from the DOM, retrying" — the flake we saw twice.
+      // Instead: wait for the ACTUAL state change — the task card either
+      // disappears entirely (back to WHEEL_IDLE) or gets replaced with a
+      // different task's text (auto-advanced to the last remaining task) —
+      // rather than a fixed sleep.
+      // NOTE: [data-testid="wheel-screen"] is NOT a reliable "back at
+      // wheel idle" signal on its own — it stays mounted (frozen) BEHIND
+      // the task card in ALL of WHEEL_IDLE/WHEEL_SPINNING/TASK_CARD, so
+      // checking it alone would pass immediately while the task card is
+      // still visible/transitioning.
       await checkbox.click()
-      await page.waitForTimeout(1500)
+      await expect(async () => {
+        const cardVisible = await page.locator('[data-testid="task-card"]').isVisible()
+        const cardTextChanged = cardVisible
+          ? (await page.locator('[data-testid="task-card"]').innerText()) !== taskTextBefore
+          : false
+        const doneVisible = await allDone.isVisible()
+        // Either the card is fully gone (back to wheel idle), or it's
+        // showing a genuinely different task, or we've reached ALL_DONE.
+        expect(!cardVisible || cardTextChanged || doneVisible).toBe(true)
+      }).toPass({ timeout: 5000 })
 
       // If last task was auto-shown (direct TASK_CARD after completion), check it off too
       if (await checkbox.isVisible({ timeout: 1000 }).catch(() => false)) {
         await checkbox.click()
-        await page.waitForTimeout(1500)
+        await expect(async () => {
+          const cardVisible = await page.locator('[data-testid="task-card"]').isVisible()
+          const doneVisible = await allDone.isVisible()
+          expect(!cardVisible || doneVisible).toBe(true)
+        }).toPass({ timeout: 5000 })
       }
     }
 
