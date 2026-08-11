@@ -336,7 +336,7 @@ function App() {
       saveSelectedTask(null, 0)
       setAppState('WHEEL_IDLE')
     }
-  }, [tasks, completedCount])
+  }, [tasks])
 
   const handleTaskComplete = () => {
     if (!selectedTask) return
