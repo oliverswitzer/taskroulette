@@ -202,11 +202,15 @@ export default function WheelScreen({
       style={{
         // In frozen mode: size to fit exactly above the task card bottom
         // sheet, using its REAL measured height (reservedBottomHeight) rather
-        // than a hardcoded guess. 100svh = stable small viewport (excludes
-        // Safari address bar) so the wheel stays fully visible regardless of
-        // URL bar state.
-        height: frozen ? `calc(100svh - ${reservedBottomHeight}px)` : undefined,
-        minHeight: frozen ? undefined : '100dvh',
+        // than a hardcoded guess. Uses --app-height (JS-measured real
+        // viewport height, see lib/viewportHeightFix.ts) instead of
+        // svh/dvh — those units are a documented Safari-only source of
+        // layout bugs (WebKit bug #153852) where the toolbar show/hide
+        // transition can leave them computed a frame behind the actual
+        // rendered viewport, causing black bars/clipped content that
+        // Chrome never exhibits.
+        height: frozen ? `calc(var(--app-height, 100vh) - ${reservedBottomHeight}px)` : undefined,
+        minHeight: frozen ? undefined : 'var(--app-height, 100vh)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

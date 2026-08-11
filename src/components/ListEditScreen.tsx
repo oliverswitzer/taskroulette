@@ -70,10 +70,16 @@ export default function ListEditScreen({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       style={{
-        // Fixed to the viewport height (not just minHeight) — the page/window
-        // itself must never scroll. The task list below has its own internal
-        // scroll region so all tasks stay reachable without moving the page.
-        height: '100dvh',
+        // Fixed to the real measured viewport height (--app-height, driven
+        // by JS from window.innerHeight/visualViewport — see
+        // lib/viewportHeightFix.ts) rather than the CSS `100dvh` unit.
+        // dvh is a documented Safari-only source of layout bugs (WebKit
+        // bug #153852): the toolbar show/hide transition can leave it
+        // computed a frame behind the actual rendered viewport, which is
+        // what produced black bars/clipped content in Safari specifically
+        // (Chrome was never affected) after this screen was first locked
+        // to a fixed height.
+        height: 'var(--app-height, 100vh)',
         display: 'flex',
         flexDirection: 'column',
         padding: '48px 20px 0',

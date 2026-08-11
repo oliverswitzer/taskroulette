@@ -35,20 +35,19 @@
 }
 
 html, body, #root {
+  /* Was `min-height: 100dvh` — dvh is a well-documented Safari-only
+     source of layout bugs (WebKit bug #153852, reproducing as recently
+     as iOS 26): Safari's toolbar show/hide can leave dvh computed a
+     frame behind the actual rendered viewport, producing black
+     bars/clipped content that Chrome never exhibits. --app-height is
+     set via JS from the real window.innerHeight/visualViewport.height
+     (see main.tsx / lib/viewportHeightFix.ts) and kept in sync on
+     resize, so it always matches what's actually visible. */
   height: 100%;
-  min-height: 100dvh;
+  min-height: var(--app-height, 100vh);
   background: var(--color-base);
   color: var(--color-ink);
   overflow-x: hidden;
-  /* No scrolling anywhere on mobile — every screen must fit within the
-     viewport instead of relying on scroll. overscroll-behavior stops the
-     iOS "rubber band" bounce from revealing blank space beyond the fixed
-     viewport even if some inner content briefly overflows during a
-     transition. (Not using position:fixed here — that breaks iOS's
-     automatic scroll-into-view when the keyboard opens for the dump
-     textarea.) */
-  overflow-y: hidden;
-  overscroll-behavior: none;
 }
 
 button {

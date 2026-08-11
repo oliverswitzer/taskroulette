@@ -392,7 +392,7 @@ function App() {
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        minHeight: 'var(--app-height, 100vh)',
         background: 'var(--color-base)',
         color: 'var(--color-ink)',
         fontFamily: 'Inter, system-ui, sans-serif',
@@ -403,7 +403,7 @@ function App() {
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: '100dvh' }}>
+      <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: 'var(--app-height, 100vh)' }}>
       <AnimatePresence>
         {appState === 'DUMP' && (
           <motion.div

@@ -16,7 +16,7 @@ export default function ParsingScreen() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       style={{
-        minHeight: '100dvh',
+        minHeight: 'var(--app-height, 100vh)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
