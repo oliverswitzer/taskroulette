@@ -190,6 +190,37 @@ test.describe('Wheel slice click popover', () => {
     await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
   })
 
+  test('popover stays fully within the viewport when clicking a slice on the right side', async ({ page }) => {
+    // Regression test: framer-motion's own `transform` (driven by the
+    // popover's initial/animate scale+y values) silently overwrote a CSS
+    // `transform: translate(-50%, 0)` that was being used to center the
+    // popover horizontally on the click point. The clamp math looked
+    // correct on paper but the actual rendered position ignored the -50%
+    // shift entirely, so clicking a slice on the right half of the wheel
+    // (any x position, but especially with a long task name) rendered the
+    // popover clipped off the right edge on mobile viewports.
+    await goToWheel(page, [
+      'Set up Oddly Good profile on Postiz',
+      'Create Postiz app account',
+    ])
+    const canvas = page.locator('canvas')
+    const box = await canvas.boundingBox()
+    if (!box) throw new Error('canvas has no bounding box')
+    // Right side of the wheel, roughly mid-height
+    await page.mouse.click(box.x + box.width * 0.75, box.y + box.height * 0.55)
+
+    const popover = page.locator('[data-testid="slice-popover"]')
+    await expect(popover).toBeVisible({ timeout: 3000 })
+    await page.waitForTimeout(400) // let the spring animation settle
+
+    const popoverBox = await popover.boundingBox()
+    const viewport = page.viewportSize()
+    expect(popoverBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    expect(popoverBox!.x).toBeGreaterThanOrEqual(0)
+    expect(popoverBox!.x + popoverBox!.width).toBeLessThanOrEqual(viewport!.width)
+  })
+
   test('"Set as active task" jumps straight to the task card, skipping the spin', async ({ page }) => {
     await goToWheel(page, ['Call dentist', 'Buy groceries', 'Email Sarah'])
     const canvas = page.locator('canvas')

@@ -7,6 +7,11 @@ import { resumeAudioContext, suspendAudioContext, playTick } from '../audio'
 import { MAX_TASKS, MIN_SWIPE_VELOCITY, MAX_SWIPE_VELOCITY } from '../constants'
 import WheelCanvas from './WheelCanvas'
 
+// Fixed width for the slice-click popover. Needs to be a real fixed value
+// (not min-width) so both the header-text truncation and the on-screen
+// clamp math have a single consistent number to work with.
+const POPOVER_WIDTH = 220
+
 interface WheelScreenProps {
   tasks: Task[]
   onSpinStart?: () => void
@@ -353,15 +358,30 @@ export default function WheelScreen({
               transition={{ type: 'spring', damping: 28, stiffness: 340 }}
               style={{
                 position: 'fixed',
-                left: Math.min(Math.max(slicePopover.x, 100), window.innerWidth - 100),
+                // Fixed width (not just minWidth) so the header text's
+                // whiteSpace:nowrap + ellipsis truncation actually has
+                // something to truncate against — without a max width, a
+                // long task name stretched the popover wider than the
+                // clamp math assumed, pushing it off the right edge on
+                // mobile ("Create Postiz app account" bug).
+                width: POPOVER_WIDTH,
+                // Left edge computed directly (not centered via CSS
+                // transform) — framer-motion drives its own `transform`
+                // from the animate/initial scale+y values and silently
+                // overwrites any translate(-50%) set via the style prop,
+                // which is what broke the on-screen clamping here: the
+                // math looked centered but the actual rendered position
+                // ignored the -50% shift entirely.
+                left: Math.min(
+                  Math.max(slicePopover.x - POPOVER_WIDTH / 2, 8),
+                  window.innerWidth - POPOVER_WIDTH - 8
+                ),
                 top: Math.min(Math.max(slicePopover.y, 20), window.innerHeight - 160),
-                transform: 'translate(-50%, 0)',
                 zIndex: 61,
                 background: 'oklch(18% 0.025 260)',
                 border: '1px solid oklch(30% 0.025 260)',
                 borderRadius: 14,
                 padding: 6,
-                minWidth: 200,
                 boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
                 display: 'flex',
                 flexDirection: 'column',
