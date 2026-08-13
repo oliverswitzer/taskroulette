@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { Task, GoogleTask } from '../types'
+import type { Task, GoogleTask, AppendResult } from '../types'
 import { MAX_TASKS } from '../constants'
 import TaskForm from './TaskForm'
 import GoogleTasksSheet from './GoogleTasksSheet'
+import BrainDumpToggle from './BrainDumpToggle'
 
 interface ListEditScreenProps {
   tasks: Task[]
@@ -12,6 +13,14 @@ interface ListEditScreenProps {
   onDeleteTask: (id: string) => void
   onProceed: () => void
   canAddMore: boolean
+  // ── Brain-dump (append) mode — shared with the wheel's edit sheet ──
+  onAppendDump: (dump: string, photo?: File) => Promise<AppendResult>
+  appendLoading?: boolean
+  appendError?: string
+  appendResetSignal?: number
+  appendToast?: string | null
+  dumpPhoto: File | null
+  onDumpPhotoChange: (file: File | null) => void
 }
 
 export default function ListEditScreen({
@@ -21,6 +30,13 @@ export default function ListEditScreen({
   onDeleteTask,
   onProceed,
   canAddMore,
+  onAppendDump,
+  appendLoading = false,
+  appendError,
+  appendResetSignal = 0,
+  appendToast,
+  dumpPhoto,
+  onDumpPhotoChange,
 }: ListEditScreenProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -189,104 +205,124 @@ export default function ListEditScreen({
           ))}
         </AnimatePresence>
 
-        {/* Add form */}
-        <AnimatePresence>
-          {showAddForm && (
-            <motion.div
-              key="add-form"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              style={{
-                background: 'var(--color-surface)',
-                borderRadius: 'var(--rounded-md)',
-                padding: 16,
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <TaskForm
-                mode="add"
-                onSubmit={handleAdd}
-                onCancel={() => setShowAddForm(false)}
-                submitLabel="Add task"
-                placeholder="What else needs doing?"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Add affordances — wrapped in the shared Quick add / Brain dump
+            toggle (same component as the wheel's edit sheet, no duplication).
+            The task list above stays visible; only the ADD surface toggles.
+            Quick add = the existing inline form + Google import. Brain dump =
+            the shared append panel (textarea + photo + Google, parsed by AI). */}
+        <BrainDumpToggle
+          activeCount={count}
+          onAppendDump={onAppendDump}
+          appendLoading={appendLoading}
+          appendError={appendError}
+          appendResetSignal={appendResetSignal}
+          appendToast={appendToast}
+          dumpPhoto={dumpPhoto}
+          onDumpPhotoChange={onDumpPhotoChange}
+          submitLabel="Add to list &rarr;"
+        >
+          {/* Quick add slot */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Add form */}
+            <AnimatePresence>
+              {showAddForm && (
+                <motion.div
+                  key="add-form"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  style={{
+                    background: 'var(--color-surface)',
+                    borderRadius: 'var(--rounded-md)',
+                    padding: 16,
+                    border: '1px solid var(--color-border)',
+                  }}
+                >
+                  <TaskForm
+                    mode="add"
+                    onSubmit={handleAdd}
+                    onCancel={() => setShowAddForm(false)}
+                    submitLabel="Add task"
+                    placeholder="What else needs doing?"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        {/* Add task button */}
-        {canAddMore && !showAddForm && (
-          <motion.button
-            type="button"
-            onClick={() => setShowAddForm(true)}
-            aria-label="+ Add another task"
-            whileTap={{ scale: 0.98 }}
-            style={{
-              background: 'transparent',
-              border: '1px dashed var(--color-border)',
-              borderRadius: 'var(--rounded-md)',
-              padding: '14px 20px',
-              minHeight: 52,
-              width: '100%',
-              fontSize: '0.9375rem',
-              color: 'var(--color-ink-muted)',
-              cursor: 'pointer',
-              textAlign: 'center',
-              transition: 'border-color 0.18s ease, color 0.18s ease',
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget
-              el.style.borderColor = 'var(--color-accent)'
-              el.style.color = 'var(--color-ink)'
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget
-              el.style.borderColor = 'var(--color-border)'
-              el.style.color = 'var(--color-ink-muted)'
-            }}
-          >
-            + Add another task
-          </motion.button>
-        )}
+            {/* Add task button */}
+            {canAddMore && !showAddForm && (
+              <motion.button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                aria-label="+ Add another task"
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  background: 'transparent',
+                  border: '1px dashed var(--color-border)',
+                  borderRadius: 'var(--rounded-md)',
+                  padding: '14px 20px',
+                  minHeight: 52,
+                  width: '100%',
+                  fontSize: '0.9375rem',
+                  color: 'var(--color-ink-muted)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'border-color 0.18s ease, color 0.18s ease',
+                }}
+                onMouseEnter={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = 'var(--color-accent)'
+                  el.style.color = 'var(--color-ink)'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget
+                  el.style.borderColor = 'var(--color-border)'
+                  el.style.color = 'var(--color-ink-muted)'
+                }}
+              >
+                + Add another task
+              </motion.button>
+            )}
 
-        {/* Google Tasks import button — shown when below cap */}
-        {count < MAX_TASKS && (
-          <div style={{ position: 'relative', width: '100%' }}>
-            <motion.button
-              type="button"
-              onClick={() => setShowGoogleSheet(true)}
-              aria-label="Import from Google Tasks"
-              data-testid="google-tasks-btn"
-              whileTap={{ scale: 0.98 }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: 'transparent',
-                border: '1px solid oklch(28% 0.025 260)',
-                borderRadius: 'var(--rounded-md)',
-                padding: '12px 20px',
-                minHeight: 48,
-                width: '100%',
-                fontSize: '0.875rem',
-                color: 'oklch(60% 0.02 260)',
-                cursor: 'pointer',
-                textAlign: 'center',
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
-                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
-                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
-              </svg>
-              Import from Google Tasks
-            </motion.button>
+            {/* Google Tasks import button — shown when below cap */}
+            {count < MAX_TASKS && (
+              <div style={{ position: 'relative', width: '100%' }}>
+                <motion.button
+                  type="button"
+                  onClick={() => setShowGoogleSheet(true)}
+                  aria-label="Import from Google Tasks"
+                  data-testid="google-tasks-btn"
+                  whileTap={{ scale: 0.98 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    background: 'transparent',
+                    border: '1px solid oklch(28% 0.025 260)',
+                    borderRadius: 'var(--rounded-md)',
+                    padding: '12px 20px',
+                    minHeight: 48,
+                    width: '100%',
+                    fontSize: '0.875rem',
+                    color: 'oklch(60% 0.02 260)',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
+                    <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+                    <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                    <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                    <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+                  </svg>
+                  Import from Google Tasks
+                </motion.button>
+              </div>
+            )}
           </div>
-        )}
+        </BrainDumpToggle>
       </div>
 
       {/* Proceed CTA — fixed bottom */}

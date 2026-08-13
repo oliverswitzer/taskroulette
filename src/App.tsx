@@ -536,6 +536,13 @@ function App() {
               onDeleteTask={handleDeleteTask}
               onProceed={handleProceed}
               canAddMore={tasks.filter(t => !t.completed).length < MAX_TASKS}
+              onAppendDump={handleAppendDump}
+              appendLoading={appendLoading}
+              appendError={appendError}
+              appendResetSignal={appendResetSignal}
+              appendToast={appendToast}
+              dumpPhoto={editSheetPhoto}
+              onDumpPhotoChange={setEditSheetPhoto}
             />
           </motion.div>
         )}

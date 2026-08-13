@@ -24,6 +24,18 @@ async function goToWheel(page: Page, taskTexts: string[]) {
   await expect(page.locator('[data-testid="wheel-screen"]')).toBeVisible({ timeout: 8000 })
 }
 
+// Seed straight to the initial "Your tasks" LIST_EDIT page with N tasks.
+async function goToListEdit(page: Page, taskTexts: string[]) {
+  await page.goto('/')
+  await page.waitForFunction(() => typeof window.__setAppState !== 'undefined', { timeout: 15000 })
+  await page.evaluate((texts: string[]) => {
+    const tasks = texts.map((text, i) => ({ id: String(i + 1), text, position: i, completed: false }))
+    window.__setTasks(tasks)
+    window.__setAppState('LIST_EDIT')
+  }, taskTexts)
+  await expect(page.getByRole('button', { name: /let's spin/i })).toBeVisible({ timeout: 8000 })
+}
+
 test.describe('Mid-session brain dump (append)', () => {
   test('brain dump from the edit sheet APPENDS to the current list, not replaces', async ({ page }) => {
     test.setTimeout(60_000)
@@ -133,5 +145,49 @@ test.describe('Mid-session brain dump (append)', () => {
     await page.waitForTimeout(400)
     await page.screenshot({ path: `${OUT}/wheel-idle-20tasks-mobile.png` })
     console.log('[brain dump] ✓ captured 20-slice wheel screenshot')
+  })
+})
+
+test.describe('Brain dump on the initial "Your tasks" page (LIST_EDIT)', () => {
+  test('the SAME toggle appears on the initial task-edit page and APPENDS, not replaces', async ({ page }) => {
+    test.setTimeout(60_000)
+
+    await goToListEdit(page, ['Existing task one', 'Existing task two'])
+
+    // The list is visible on the page (not hidden behind the toggle).
+    await expect(page.getByText('Existing task one')).toBeVisible()
+
+    // The shared toggle is present here too — defaults to Quick add.
+    await expect(page.getByTestId('edit-mode-quick')).toHaveAttribute('aria-selected', 'true')
+    await page.getByTestId('edit-mode-dump').click()
+
+    // Same explainer as the wheel sheet (shared component).
+    const explainer = page.getByTestId('brain-dump-explainer')
+    await expect(explainer).toContainText(/added to your current list/i)
+    await expect(explainer).toContainText(/nothing gets replaced/i)
+    await expect(page.getByTestId('brain-dump-capacity')).toContainText('2/20')
+
+    await page.screenshot({ path: `${OUT}/list-edit-brain-dump-mobile.png` })
+
+    // Dump two more via the real parse endpoint.
+    await page.getByRole('textbox').fill('call the dentist to book a cleaning, pay the electricity bill online')
+    await page.getByTestId('brain-dump-submit').click()
+
+    await expect(page.getByTestId('brain-dump-toast')).toBeVisible({ timeout: API_TIMEOUT })
+    await expect(page.getByTestId('brain-dump-toast')).toContainText(/added/i)
+
+    // Originals must still be present (append, not replace) — the list is
+    // right there on the page, no need to switch tabs.
+    await expect(page.getByText('Existing task one')).toBeVisible()
+    await expect(page.getByText('Existing task two')).toBeVisible()
+
+    // localStorage confirms the merge grew the list beyond the original 2.
+    const activeCount = await page.evaluate(() => {
+      const raw = localStorage.getItem('tr-tasks')
+      return raw ? (JSON.parse(raw) as { completed: boolean }[]).filter(t => !t.completed).length : -1
+    })
+    expect(activeCount).toBeGreaterThanOrEqual(4)
+
+    console.log('[brain dump] ✓ initial page: same toggle, appended, originals preserved')
   })
 })

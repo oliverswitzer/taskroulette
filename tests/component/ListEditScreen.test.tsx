@@ -19,6 +19,12 @@ const defaultProps = {
   onDeleteTask: vi.fn(),
   onProceed: vi.fn(),
   canAddMore: true,
+  onAppendDump: vi.fn(async () => ({ added: 0, dropped: 0 })),
+  appendLoading: false,
+  appendResetSignal: 0,
+  appendToast: null,
+  dumpPhoto: null,
+  onDumpPhotoChange: vi.fn(),
 }
 
 describe('ListEditScreen', () => {
@@ -92,5 +98,64 @@ describe('ListEditScreen', () => {
     render(<ListEditScreen {...defaultProps} tasks={tasks} />)
     // Only 2 active tasks even though the array has 4 total entries.
     expect(screen.getByText(new RegExp(`2\\/${MAX_TASKS}`))).toBeInTheDocument()
+  })
+
+  // ── Brain-dump toggle (shared with the wheel's edit sheet) ──────────────────
+
+  it('defaults to Quick add mode — task list + add affordance visible, no brain-dump panel', () => {
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(2)} />)
+    expect(screen.getByTestId('edit-mode-quick')).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('edit-mode-dump')).toHaveAttribute('aria-selected', 'false')
+    // The task list stays visible on the page (NOT hidden behind the toggle)
+    expect(screen.getByText('Task 1')).toBeInTheDocument()
+    // Brain-dump panel not shown yet
+    expect(screen.queryByTestId('brain-dump-explainer')).not.toBeInTheDocument()
+  })
+
+  it('the task list stays visible even in Brain dump mode (list is not behind the toggle)', async () => {
+    const user = userEvent.setup()
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(2)} />)
+    await user.click(screen.getByTestId('edit-mode-dump'))
+    // List still on the page
+    expect(screen.getByText('Task 1')).toBeInTheDocument()
+    // And the brain-dump panel is now shown
+    expect(screen.getByTestId('brain-dump-submit')).toBeInTheDocument()
+  })
+
+  it('switching to Brain dump reveals the append explainer that says nothing is replaced', async () => {
+    const user = userEvent.setup()
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(2)} />)
+    await user.click(screen.getByTestId('edit-mode-dump'))
+    const explainer = screen.getByTestId('brain-dump-explainer')
+    expect(explainer).toHaveTextContent(/added to your current list/i)
+    expect(explainer).toHaveTextContent(/nothing gets replaced/i)
+  })
+
+  it('brain-dump mode shows live capacity reflecting active count and room left', async () => {
+    const user = userEvent.setup()
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(14)} />)
+    await user.click(screen.getByTestId('edit-mode-dump'))
+    const capacity = screen.getByTestId('brain-dump-capacity')
+    expect(capacity).toHaveTextContent(`14/${MAX_TASKS}`)
+    expect(capacity).toHaveTextContent(/room for 6 more/i)
+  })
+
+  it('brain-dump submit calls onAppendDump (append), never onProceed (which would replace/advance)', async () => {
+    const user = userEvent.setup()
+    const onAppendDump = vi.fn(async () => ({ added: 1, dropped: 0 }))
+    const onProceed = vi.fn()
+    render(
+      <ListEditScreen
+        {...defaultProps}
+        tasks={makeTasks(2)}
+        onAppendDump={onAppendDump}
+        onProceed={onProceed}
+      />
+    )
+    await user.click(screen.getByTestId('edit-mode-dump'))
+    await user.type(screen.getByRole('textbox'), 'call the dentist')
+    await user.click(screen.getByTestId('brain-dump-submit'))
+    expect(onAppendDump).toHaveBeenCalledTimes(1)
+    expect(onProceed).not.toHaveBeenCalled()
   })
 })
