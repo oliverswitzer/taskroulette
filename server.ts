@@ -110,7 +110,7 @@ Extract a concrete, actionable task list from this brain dump.
 Return ONLY a valid JSON array of strings -- no explanation, no markdown, no code blocks.
 Rules:
 - Each task: concise (under 8 words), actionable, specific
-- Maximum 15 tasks (prioritize the most important if more are implied)
+- Maximum 20 tasks (prioritize the most important if more are implied)
 - Start each task with a verb
 - No duplicates
 

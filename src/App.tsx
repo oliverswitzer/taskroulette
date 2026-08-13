@@ -12,6 +12,7 @@ import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
 import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
+import type { AppendResult } from './types'
 import EmailGateModal from './components/EmailGateModal'
 import {
   saveTasks,
@@ -108,6 +109,16 @@ function App() {
   })
   const [dumpPhoto, setDumpPhoto] = useState<File | null>(null)
 
+  // ── Mid-session brain dump (from the wheel's edit sheet) ────────────────────
+  // A photo lifted so it survives across the sheet's toggle switches.
+  const [editSheetPhoto, setEditSheetPhoto] = useState<File | null>(null)
+  const [appendLoading, setAppendLoading] = useState(false)
+  const [appendError, setAppendError] = useState<string | undefined>()
+  // Bumped after a successful append so BrainDumpForm clears its textarea/photo.
+  const [appendResetSignal, setAppendResetSignal] = useState(0)
+  // Transient toast summarizing the last append ("Added 8, hit your 20-task limit").
+  const [appendToast, setAppendToast] = useState<string | null>(null)
+
   // Auto-spin signal — incremented each time user hits "spin again"
   // Using a counter (not a ref) so WheelScreen's useEffect detects the change
   const [autoSpinSignal] = useState(0)
@@ -121,6 +132,14 @@ function App() {
   // Persist to localStorage on every relevant state change
   useEffect(() => { saveAppState(appState) }, [appState])
   useEffect(() => { saveTasks(tasks) }, [tasks])
+
+  // Always-fresh mirror of `tasks` for use inside stable (empty-dep) callbacks
+  // like handleAppendDump, whose closure would otherwise capture the initial
+  // (empty) task list. The append handler runs after an awaited API call, so it
+  // must read the CURRENT list — not whatever existed when the callback was
+  // memoized — to compute cap/overflow correctly.
+  const tasksRef = useRef(tasks)
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
 
   // Measure the real TaskCard height whenever it's mounted/resizes (task text
   // length, safe-area insets, and font rendering all affect the actual height —
@@ -230,6 +249,73 @@ function App() {
     }
     setTasks(prev => [...prev, newTask])
   }
+
+  // ── Mid-session brain dump → append (does NOT leave WHEEL_IDLE) ──────────────
+  // Reuses the same parse API as the first-run dump, but MERGES results into the
+  // current list instead of replacing, and never routes through the full-screen
+  // PARSING app-state. Caps once against the active count and reports how many
+  // were added vs. dropped so the sheet can show honest overflow feedback.
+  const handleAppendDump = useCallback(async (dump: string, photo?: File): Promise<AppendResult> => {
+    setAppendError(undefined)
+    setAppendToast(null)
+    setAppendLoading(true)
+    try {
+      let parsed: string[]
+      if (photo) {
+        const base64 = await fileToBase64(photo)
+        parsed = await parseTasksFromImage(base64, photo.type, dump || undefined)
+      } else {
+        parsed = await parseTasks(dump)
+      }
+
+      const cleaned = parsed.map(t => t.trim()).filter(t => t.length > 0)
+      if (cleaned.length === 0) {
+        setAppendError('No tasks found in that — try adding more detail or a clearer photo.')
+        return { added: 0, dropped: 0 }
+      }
+
+      // Read the CURRENT list via the ref — `tasks` here is the frozen closure
+      // from useCallback([]) (empty on first render). The ref is kept in sync by
+      // an effect, so it reflects seeded/edited/completed state at call time.
+      const current = tasksRef.current
+      const active = current.filter(t => !t.completed)
+      const room = Math.max(0, MAX_TASKS - active.length)
+      const toAdd = cleaned.slice(0, room)
+      const result: AppendResult = { added: toAdd.length, dropped: cleaned.length - toAdd.length }
+
+      if (toAdd.length > 0) {
+        const base = current.length
+        const newTasks: Task[] = toAdd.map((text, i) => ({
+          id: generateId(),
+          text,
+          position: base + i,
+          completed: false,
+        }))
+        setTasks(prev => [...prev, ...newTasks])
+      }
+
+      // Honest, ADHD-friendly feedback: never a silent drop.
+      if (result.added === 0 && result.dropped > 0) {
+        setAppendToast(`You're at the ${MAX_TASKS}-task limit — complete or remove a few to add more.`)
+      } else if (result.dropped > 0) {
+        setAppendToast(`Added ${result.added} — you hit the ${MAX_TASKS}-task limit, so ${result.dropped} didn't fit.`)
+      } else {
+        setAppendToast(`Added ${result.added} task${result.added !== 1 ? 's' : ''}.`)
+      }
+
+      if (result.added > 0) {
+        setEditSheetPhoto(null)
+        setAppendResetSignal(s => s + 1)
+      }
+      return result
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      setAppendError(msg)
+      return { added: 0, dropped: 0 }
+    } finally {
+      setAppendLoading(false)
+    }
+  }, [])
 
   const handleEditTask = (id: string, text: string) => {
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, text } : t)))
@@ -487,6 +573,13 @@ function App() {
               onDeleteTask={handleDeleteTask}
               onClose={handleCloseEdit}
               canAddMore={tasks.filter(t => !t.completed).length < MAX_TASKS}
+              onAppendDump={handleAppendDump}
+              appendLoading={appendLoading}
+              appendError={appendError}
+              appendResetSignal={appendResetSignal}
+              appendToast={appendToast}
+              dumpPhoto={editSheetPhoto}
+              onDumpPhotoChange={setEditSheetPhoto}
             />
           </motion.div>
         )}

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ListEditScreen from '../../src/components/ListEditScreen'
+import { MAX_TASKS } from '../../src/constants'
 import type { Task } from '../../src/types'
 
 const makeTasks = (count: number): Task[] =>
@@ -40,36 +41,36 @@ describe('ListEditScreen', () => {
     expect(btn).toBeDisabled()
   })
 
-  it("'Let's spin' CTA disabled when > 15 tasks", () => {
-    render(<ListEditScreen {...defaultProps} tasks={makeTasks(16)} canAddMore={false} />)
+  it("'Let's spin' CTA disabled when over MAX_TASKS", () => {
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(MAX_TASKS + 1)} canAddMore={false} />)
     const btn = screen.getByRole('button', { name: /spin/i })
     expect(btn).toBeDisabled()
   })
 
-  it("'Let's spin' CTA enabled when 1-15 tasks", () => {
+  it("'Let's spin' CTA enabled when 1..MAX_TASKS", () => {
     render(<ListEditScreen {...defaultProps} tasks={makeTasks(3)} />)
     const btn = screen.getByRole('button', { name: /spin/i })
     expect(btn).not.toBeDisabled()
   })
 
-  it("counter shows 'X/15'", () => {
+  it("counter shows 'X/MAX_TASKS'", () => {
     render(<ListEditScreen {...defaultProps} tasks={makeTasks(3)} />)
-    expect(screen.getByText(/3\/15/)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`3\\/${MAX_TASKS}`))).toBeInTheDocument()
   })
 
-  it('counter shows warning color when at 15', () => {
-    render(<ListEditScreen {...defaultProps} tasks={makeTasks(15)} canAddMore={false} />)
-    const badge = screen.getByText(/15\/15/)
+  it('counter shows warning color when at MAX_TASKS', () => {
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(MAX_TASKS)} canAddMore={false} />)
+    const badge = screen.getByText(new RegExp(`${MAX_TASKS}\\/${MAX_TASKS}`))
     expect(badge).toHaveAttribute('data-warning', 'true')
   })
 
-  it('add task button visible when < 15 tasks', () => {
+  it('add task button visible when < MAX_TASKS', () => {
     render(<ListEditScreen {...defaultProps} tasks={makeTasks(3)} canAddMore={true} />)
     expect(screen.getByRole('button', { name: /add/i })).toBeInTheDocument()
   })
 
-  it('add task button NOT visible when at 15 tasks', () => {
-    render(<ListEditScreen {...defaultProps} tasks={makeTasks(15)} canAddMore={false} />)
+  it('add task button NOT visible when at MAX_TASKS', () => {
+    render(<ListEditScreen {...defaultProps} tasks={makeTasks(MAX_TASKS)} canAddMore={false} />)
     // The add-task dashed button shouldn't appear
     expect(screen.queryByRole('button', { name: /\+ add/i })).not.toBeInTheDocument()
   })
@@ -82,7 +83,7 @@ describe('ListEditScreen', () => {
     expect(onProceed).toHaveBeenCalled()
   })
 
-  it("counter counts only active tasks, ignoring completed tasks in the array", () => {
+  it('counter counts only active tasks, ignoring completed tasks in the array', () => {
     const tasks: Task[] = [
       ...makeTasks(2),
       { id: 'c1', text: 'Completed 1', position: 2, completed: true },
@@ -90,6 +91,6 @@ describe('ListEditScreen', () => {
     ]
     render(<ListEditScreen {...defaultProps} tasks={tasks} />)
     // Only 2 active tasks even though the array has 4 total entries.
-    expect(screen.getByText('2/15')).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`2\\/${MAX_TASKS}`))).toBeInTheDocument()
   })
 })

@@ -74,6 +74,77 @@ describe('useTasks — addTask', () => {
   })
 })
 
+describe('useTasks — addTasks (batch append)', () => {
+  it('appends all tasks when they fit under the cap', () => {
+    const { result } = renderHook(() => useTasks())
+    let ret: { added: number; dropped: number } = { added: 0, dropped: 0 }
+    act(() => { ret = result.current.addTasks(['A', 'B', 'C']) })
+    expect(ret).toEqual({ added: 3, dropped: 0 })
+    expect(result.current.activeTasks).toHaveLength(3)
+    expect(result.current.tasks.map(t => t.text)).toEqual(['A', 'B', 'C'])
+  })
+
+  it('caps at MAX_TASKS and reports how many were dropped', () => {
+    const initial = Array.from({ length: MAX_TASKS - 2 }, (_, i) => ({
+      id: `id-${i}`,
+      text: `Task ${i}`,
+      position: i,
+      completed: false,
+    }))
+    const { result } = renderHook(() => useTasks(initial))
+    let ret: { added: number; dropped: number } = { added: 0, dropped: 0 }
+    // 5 incoming, only room for 2
+    act(() => { ret = result.current.addTasks(['W', 'X', 'Y', 'Z', 'Q']) })
+    expect(ret).toEqual({ added: 2, dropped: 3 })
+    expect(result.current.activeTasks).toHaveLength(MAX_TASKS)
+  })
+
+  it('adds nothing and reports all dropped when already at the cap', () => {
+    const initial = Array.from({ length: MAX_TASKS }, (_, i) => ({
+      id: `id-${i}`,
+      text: `Task ${i}`,
+      position: i,
+      completed: false,
+    }))
+    const { result } = renderHook(() => useTasks(initial))
+    let ret: { added: number; dropped: number } = { added: 0, dropped: 0 }
+    act(() => { ret = result.current.addTasks(['nope', 'still nope']) })
+    expect(ret).toEqual({ added: 0, dropped: 2 })
+    expect(result.current.activeTasks).toHaveLength(MAX_TASKS)
+  })
+
+  it('completed tasks do not count against the batch cap', () => {
+    const initial = Array.from({ length: MAX_TASKS }, (_, i) => ({
+      id: `id-${i}`,
+      text: `Task ${i}`,
+      position: i,
+      completed: true, // all completed — should free every slot
+    }))
+    const { result } = renderHook(() => useTasks(initial))
+    let ret: { added: number; dropped: number } = { added: 0, dropped: 0 }
+    act(() => { ret = result.current.addTasks(['A', 'B', 'C']) })
+    expect(ret).toEqual({ added: 3, dropped: 0 })
+    expect(result.current.activeTasks).toHaveLength(3)
+  })
+
+  it('trims and ignores blank/whitespace-only entries', () => {
+    const { result } = renderHook(() => useTasks())
+    let ret: { added: number; dropped: number } = { added: 0, dropped: 0 }
+    act(() => { ret = result.current.addTasks(['  A  ', '', '   ', 'B']) })
+    expect(ret).toEqual({ added: 2, dropped: 0 })
+    expect(result.current.tasks.map(t => t.text)).toEqual(['A', 'B'])
+  })
+
+  it('assigns positions continuing from the existing active count', () => {
+    const initial = [
+      { id: 'a', text: 'Existing', position: 0, completed: false },
+    ]
+    const { result } = renderHook(() => useTasks(initial))
+    act(() => { result.current.addTasks(['New1', 'New2']) })
+    expect(result.current.tasks.map(t => t.position)).toEqual([0, 1, 2])
+  })
+})
+
 describe('useTasks — editTask', () => {
   it('updates text of existing task by id', () => {
     const initial = [{ id: 'abc', text: 'Old text', position: 0, completed: false }]
