@@ -27,6 +27,7 @@ export default function AppLayout({ showHomeIcon, onHomeIconActivate, children }
         style={{
           height: 44,
           marginBottom: 24,
+          padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
         }}
