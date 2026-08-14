@@ -245,6 +245,7 @@ export default function ListEditScreen({
                     onCancel={() => setShowAddForm(false)}
                     submitLabel="Add task"
                     placeholder="What else needs doing?"
+                    emphasis="secondary"
                   />
                 </motion.div>
               )}

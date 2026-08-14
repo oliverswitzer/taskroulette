@@ -154,6 +154,7 @@ export default function EditModal({
               onSubmit={handleAdd}
               onCancel={() => setShowAddForm(false)}
               submitLabel="Add task"
+              emphasis="secondary"
             />
           </motion.div>
         )}

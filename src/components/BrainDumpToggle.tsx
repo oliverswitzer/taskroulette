@@ -151,6 +151,7 @@ export default function BrainDumpToggle({
             photoFile={dumpPhoto}
             onPhotoChange={onDumpPhotoChange}
             resetSignal={appendResetSignal}
+            emphasis="secondary"
             placeholder="Anything else on your mind? Emails, calls, errands.. just get it out. We'll sort it and add it to your list."
           />
         </div>

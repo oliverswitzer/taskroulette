@@ -54,6 +54,13 @@ interface BrainDumpFormProps {
    * AFTER a successful submit so a failed parse preserves the user's input.
    */
   resetSignal?: number
+  /**
+   * Visual weight of the submit CTA. 'primary' = loud accent fill (hero, e.g.
+   * the first-run DUMP screen where it's the sole CTA). 'secondary' = tonal
+   * tint of the accent hue (same family, quieter) for when it competes with a
+   * louder primary like "Let's spin" (the append surfaces).
+   */
+  emphasis?: 'primary' | 'secondary'
 }
 
 export default function BrainDumpForm({
@@ -69,6 +76,7 @@ export default function BrainDumpForm({
   onPhotoChange,
   enablePhotoOnboarding = false,
   resetSignal = 0,
+  emphasis = 'primary',
 }: BrainDumpFormProps) {
   const [value, setValue] = useState('')
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -457,7 +465,9 @@ export default function BrainDumpForm({
         </motion.p>
       )}
 
-      {/* Submit CTA */}
+      {/* Submit CTA. Primary = loud accent fill (first-run hero). Secondary =
+          tonal tint of the accent hue (same family, quieter) for the append
+          surfaces that compete with a louder primary like "Let's spin". */}
       <button
         type="button"
         data-testid="brain-dump-submit"
@@ -465,9 +475,21 @@ export default function BrainDumpForm({
         disabled={!canSubmit}
         aria-label={submitLabel}
         style={{
-          background: canSubmit ? 'var(--color-accent)' : 'oklch(22% 0.025 260)',
-          color: canSubmit ? 'oklch(10% 0.01 30)' : 'oklch(55% 0.02 260)',
-          border: canSubmit ? '1.5px solid transparent' : '1.5px solid oklch(30% 0.025 260)',
+          background: !canSubmit
+            ? 'oklch(22% 0.025 260)'
+            : emphasis === 'secondary'
+              ? 'oklch(20% 0.05 30)'
+              : 'var(--color-accent)',
+          color: !canSubmit
+            ? 'oklch(55% 0.02 260)'
+            : emphasis === 'secondary'
+              ? 'var(--color-accent)'
+              : 'oklch(10% 0.01 30)',
+          border: !canSubmit
+            ? '1.5px solid oklch(30% 0.025 260)'
+            : emphasis === 'secondary'
+              ? '1.5px solid oklch(38% 0.1 30)'
+              : '1.5px solid transparent',
           borderRadius: 'var(--rounded-lg)',
           padding: '0 32px',
           minHeight: 60,
