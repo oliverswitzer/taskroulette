@@ -8,7 +8,6 @@ interface TaskCardProps {
   task: Task
   onComplete: () => void
   onSkip: () => void
-  onBackToDump: () => void
 }
 
 function fireConfetti() {
@@ -26,7 +25,6 @@ export default function TaskCard({
   task,
   onComplete,
   onSkip,
-  onBackToDump,
 }: TaskCardProps) {
   const [checked, setChecked] = useState(false)
   const [completing, setCompleting] = useState(false)
@@ -61,33 +59,6 @@ export default function TaskCard({
         background: 'var(--color-base)',
       }}
     >
-      {/* Back button — top left */}
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 0 8px' }}>
-        <button
-          type="button"
-          onClick={onBackToDump}
-          aria-label="Back to task dump"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--color-ink-muted)',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 0',
-            minHeight: 44,
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          Dump
-        </button>
-      </div>
-
       {/* Floating task card */}
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}

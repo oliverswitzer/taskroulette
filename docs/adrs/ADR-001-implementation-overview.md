@@ -272,7 +272,7 @@ flowchart TD
 **Consequence:** `WheelScreen` takes `autoSpinSignal: number` prop. Any parent that wants to trigger auto-spin increments it. Pattern is reusable for any "trigger once, survive StrictMode" scenario.
 
 ### D6: Task Cap Enforced in UI, Not Server
-**Decision:** The 15-task limit is enforced in `ListEditScreen` (disables "Let's spin" CTA, shows 3/15 badge), not in the server parse routes.  
+**Decision:** The 20-task limit is enforced in `ListEditScreen` (disables "Let's spin" CTA, shows 3/20 badge), not in the server parse routes.  
 **Rationale:** The server doesn't know whether the user will delete tasks before proceeding. Capping at the server means a 16-item list photo silently loses a task. The UI is the right gate — the user can see and manage the cap.  
 **Consequence:** Both `/api/parse` and `/api/parse-image` return however many tasks Claude finds. `ListEditScreen` shows the count and blocks progression at >15.
 
@@ -302,7 +302,7 @@ taskroulette/
 │   ├── App.tsx                  # State machine, task CRUD, photo state, localStorage sync
 │   ├── api.ts                   # parseTasks(), parseTasksFromImage()
 │   ├── audio.ts                 # Web Audio mechanical tick (bandpass noise burst)
-│   ├── constants.ts             # MAX_TASKS=15, physics constants, OKLCH colors, messages
+│   ├── constants.ts             # MAX_TASKS=20, physics constants, OKLCH colors, messages
 │   ├── storage.ts               # localStorage helpers — loadAppState() sanitizes transients
 │   ├── types.ts                 # Task, AppState, PhysicsState, WheelConfig
 │   ├── lib/utils.ts             # shadcn cn() helper

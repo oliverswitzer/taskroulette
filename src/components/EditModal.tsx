@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { Task } from '../types'
+import type { Task, AppendResult } from '../types'
 import { MAX_TASKS } from '../constants'
 import TaskForm from './TaskForm'
+import BrainDumpToggle from './BrainDumpToggle'
 
 interface EditModalProps {
   isOpen: boolean
@@ -12,6 +13,14 @@ interface EditModalProps {
   onDeleteTask: (id: string) => void
   onClose: () => void
   canAddMore: boolean
+  // ── Brain-dump (append) mode ──
+  onAppendDump: (dump: string, photo?: File) => Promise<AppendResult>
+  appendLoading?: boolean
+  appendError?: string
+  appendResetSignal?: number
+  appendToast?: string | null
+  dumpPhoto: File | null
+  onDumpPhotoChange: (file: File | null) => void
 }
 
 export default function EditModal({
@@ -22,9 +31,18 @@ export default function EditModal({
   onDeleteTask,
   onClose,
   canAddMore,
+  onAppendDump,
+  appendLoading = false,
+  appendError,
+  appendResetSignal = 0,
+  appendToast,
+  dumpPhoto,
+  onDumpPhotoChange,
 }: EditModalProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  // Bumped on close so BrainDumpToggle resets to the Quick add tab on reopen.
+  const [modeResetSignal, setModeResetSignal] = useState(0)
 
   const handleEdit = useCallback(
     (id: string, text: string) => {
@@ -53,11 +71,17 @@ export default function EditModal({
   const handleClose = useCallback(() => {
     setEditingId(null)
     setShowAddForm(false)
+    setModeResetSignal(s => s + 1)
     onClose()
   }, [onClose])
 
+  useEffect(() => {
+    if (!isOpen) {
+      setModeResetSignal(s => s + 1)
+    }
+  }, [isOpen])
+
   // Active tasks stay on top; completed tasks sink to the bottom.
-  // Stable sort — relative order within each group is preserved.
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.completed === b.completed) return 0
     return a.completed ? 1 : -1
@@ -65,6 +89,100 @@ export default function EditModal({
 
   const activeCount = tasks.filter(t => !t.completed).length
   const isWarning = activeCount >= MAX_TASKS - 1
+
+  // Quick-add content for this context: the full task list (edit/delete each)
+  // + inline add form. Supplied as the toggle's Quick add slot.
+  const quickAddContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+      <AnimatePresence initial={false}>
+        {sortedTasks.map(taskItem => (
+          <motion.div
+            key={taskItem.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, x: -16, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            layout
+          >
+            {editingId === taskItem.id ? (
+              <div
+                style={{
+                  background: 'var(--color-surface2)',
+                  borderRadius: 'var(--rounded-md)',
+                  padding: 16,
+                  border: '1px solid var(--color-border)',
+                }}
+              >
+                <TaskForm
+                  mode="edit"
+                  initialValue={taskItem.text}
+                  onSubmit={text => handleEdit(taskItem.id, text)}
+                  onDelete={() => handleDelete(taskItem.id)}
+                  onCancel={() => setEditingId(null)}
+                  submitLabel="Save changes"
+                />
+              </div>
+            ) : (
+              <ModalTaskItem
+                task={taskItem}
+                onEdit={() => setEditingId(taskItem.id)}
+                onDelete={() => handleDelete(taskItem.id)}
+              />
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Inline add form */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            key="add-form"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              background: 'var(--color-surface2)',
+              borderRadius: 'var(--rounded-md)',
+              padding: 16,
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <TaskForm
+              mode="add"
+              onSubmit={handleAdd}
+              onCancel={() => setShowAddForm(false)}
+              submitLabel="Add task"
+              emphasis="secondary"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add more button */}
+      {canAddMore && !showAddForm && !editingId && (
+        <button
+          type="button"
+          onClick={() => setShowAddForm(true)}
+          style={{
+            background: 'transparent',
+            border: '1px dashed var(--color-border)',
+            borderRadius: 'var(--rounded-md)',
+            padding: '12px 20px',
+            minHeight: 48,
+            width: '100%',
+            fontSize: '0.9rem',
+            color: 'var(--color-ink-muted)',
+            cursor: 'pointer',
+            textAlign: 'center',
+          }}
+        >
+          + Add task
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <AnimatePresence>
@@ -99,7 +217,7 @@ export default function EditModal({
               bottom: 0,
               left: 0,
               right: 0,
-              maxHeight: '85vh',
+              maxHeight: '90vh',
               background: 'var(--color-surface)',
               borderRadius: '24px 24px 0 0',
               overflowY: 'auto',
@@ -109,56 +227,23 @@ export default function EditModal({
             }}
           >
             {/* Drag handle */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                padding: '12px 0 4px',
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 4,
-                  borderRadius: 'var(--rounded-full)',
-                  background: 'var(--color-border)',
-                }}
-              />
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 'var(--rounded-full)', background: 'var(--color-border)' }} />
             </div>
 
             {/* Content */}
             <div style={{ padding: '12px 20px 0', flex: 1, overflowY: 'auto' }}>
               {/* Header */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginBottom: 20,
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 700,
-                    color: 'var(--color-ink)',
-                    flex: 1,
-                  }}
-                >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-ink)', flex: 1 }}>
                   Edit your tasks
                 </h2>
                 <span
+                  data-testid="edit-modal-count"
                   style={{
-                    background: isWarning
-                      ? 'oklch(25% 0.08 30)'
-                      : 'oklch(20% 0.05 30)',
-                    color: isWarning
-                      ? 'var(--color-accent-glow)'
-                      : 'var(--color-accent)',
-                    border: isWarning
-                      ? '1px solid oklch(40% 0.12 30)'
-                      : '1px solid oklch(35% 0.1 30)',
+                    background: isWarning ? 'oklch(25% 0.08 30)' : 'oklch(20% 0.05 30)',
+                    color: isWarning ? 'var(--color-accent-glow)' : 'var(--color-accent)',
+                    border: isWarning ? '1px solid oklch(40% 0.12 30)' : '1px solid oklch(35% 0.1 30)',
                     borderRadius: 'var(--rounded-full)',
                     padding: '4px 10px',
                     fontSize: '0.75rem',
@@ -170,105 +255,21 @@ export default function EditModal({
                 </span>
               </div>
 
-              {/* Task list */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  marginBottom: 12,
-                }}
+              {/* Shared toggle: Quick add (the list above) / Brain dump (append) */}
+              <BrainDumpToggle
+                activeCount={activeCount}
+                onAppendDump={onAppendDump}
+                appendLoading={appendLoading}
+                appendError={appendError}
+                appendResetSignal={appendResetSignal}
+                appendToast={appendToast}
+                dumpPhoto={dumpPhoto}
+                onDumpPhotoChange={onDumpPhotoChange}
+                submitLabel="Add to wheel &rarr;"
+                modeResetSignal={modeResetSignal}
               >
-                <AnimatePresence initial={false}>
-                  {sortedTasks.map(taskItem => (
-                    <motion.div
-                      key={taskItem.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -16, scale: 0.97 }}
-                      transition={{
-                        duration: 0.22,
-                        ease: [0.16, 1, 0.3, 1],
-                      }}
-                      layout
-                    >
-                      {editingId === taskItem.id ? (
-                        <div
-                          style={{
-                            background: 'var(--color-surface2)',
-                            borderRadius: 'var(--rounded-md)',
-                            padding: 16,
-                            border: '1px solid var(--color-border)',
-                          }}
-                        >
-                          <TaskForm
-                            mode="edit"
-                            initialValue={taskItem.text}
-                            onSubmit={text => handleEdit(taskItem.id, text)}
-                            onDelete={() => handleDelete(taskItem.id)}
-                            onCancel={() => setEditingId(null)}
-                            submitLabel="Save changes"
-                          />
-                        </div>
-                      ) : (
-                        <ModalTaskItem
-                          task={taskItem}
-                          onEdit={() => setEditingId(taskItem.id)}
-                          onDelete={() => handleDelete(taskItem.id)}
-                        />
-                      )}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-
-                {/* Add form */}
-                <AnimatePresence>
-                  {showAddForm && (
-                    <motion.div
-                      key="add-form"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                      style={{
-                        background: 'var(--color-surface2)',
-                        borderRadius: 'var(--rounded-md)',
-                        padding: 16,
-                        border: '1px solid var(--color-border)',
-                      }}
-                    >
-                      <TaskForm
-                        mode="add"
-                        onSubmit={handleAdd}
-                        onCancel={() => setShowAddForm(false)}
-                        submitLabel="Add task"
-                      />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Add more button */}
-                {canAddMore && !showAddForm && !editingId && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(true)}
-                    style={{
-                      background: 'transparent',
-                      border: '1px dashed var(--color-border)',
-                      borderRadius: 'var(--rounded-md)',
-                      padding: '12px 20px',
-                      minHeight: 48,
-                      width: '100%',
-                      fontSize: '0.9rem',
-                      color: 'var(--color-ink-muted)',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                    }}
-                  >
-                    + Add task
-                  </button>
-                )}
-              </div>
+                {quickAddContent}
+              </BrainDumpToggle>
             </div>
 
             {/* Done button — sticky footer */}

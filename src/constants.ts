@@ -1,5 +1,5 @@
 // Task constraints
-export const MAX_TASKS = 15
+export const MAX_TASKS = 20
 export const MAX_TASK_LENGTH = 80
 export const MAX_TASK_DISPLAY_LENGTH = 12 // chars on wheel slice before truncation
 

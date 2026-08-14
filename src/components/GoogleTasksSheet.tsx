@@ -298,7 +298,7 @@ function CapacityMeter({ total, existing, selected }: { total: number; existing:
         margin: 0, fontSize: 12,
         color: isFull ? 'oklch(60% 0.2 15)' : isWarning ? 'oklch(78% 0.15 65)' : 'oklch(60% 0.02 260)',
       }}>
-        {isFull ? 'All 15 slots filled' : `${slotsLeft} slot${slotsLeft !== 1 ? 's' : ''} remaining`}
+        {isFull ? `All ${total} slots filled` : `${slotsLeft} slot${slotsLeft !== 1 ? 's' : ''} remaining`}
       </p>
     </div>
   )

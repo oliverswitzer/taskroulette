@@ -27,6 +27,13 @@ export interface WheelConfig {
   selectedIndex: number | null
 }
 
+// Outcome of a batch append (brain dump / Google import), so the UI can give
+// honest overflow feedback instead of silently dropping tasks past the cap.
+export interface AppendResult {
+  added: number
+  dropped: number
+}
+
 export interface AppStore {
   appState: AppState
   tasks: Task[]

@@ -56,10 +56,37 @@ export function useTasks(initialTasks: Task[] = []) {
     saveTasks(newTasks)
   }, [])
 
+  // Batch-append parsed tasks, capped ONCE against the current active count.
+  // Returns how many were actually added vs. dropped so the caller can show
+  // honest overflow feedback ("Added 8, you hit your 20-task limit") instead
+  // of silently truncating — the failure mode of looping single addTask calls.
+  const addTasks = useCallback((texts: string[]): { added: number; dropped: number } => {
+    const cleaned = texts.map(t => t.trim()).filter(t => t.length > 0)
+    let result = { added: 0, dropped: 0 }
+    setTasks(prev => {
+      const active = prev.filter(t => !t.completed)
+      const room = Math.max(0, MAX_TASKS - active.length)
+      const toAdd = cleaned.slice(0, room)
+      result = { added: toAdd.length, dropped: cleaned.length - toAdd.length }
+      if (toAdd.length === 0) return prev
+      const newTasks: Task[] = toAdd.map((text, i) => ({
+        id: generateId(),
+        text,
+        position: active.length + i,
+        completed: false,
+      }))
+      const updated = [...prev, ...newTasks]
+      saveTasks(updated)
+      return updated
+    })
+    return result
+  }, [])
+
   return {
     tasks,
     activeTasks,
     addTask,
+    addTasks,
     editTask,
     deleteTask,
     completeTask,

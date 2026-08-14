@@ -1,17 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { useDropzone } from 'react-dropzone'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './ui/dialog'
-import GoogleTasksSheet from './GoogleTasksSheet'
-import type { GoogleTask } from '../types'
-
-const ONBOARDING_KEY = 'tr-photo-onboarding-seen'
+import BrainDumpForm from './BrainDumpForm'
 
 interface DumpScreenProps {
   onSubmit: (dump: string, photo?: File) => void
@@ -21,482 +10,82 @@ interface DumpScreenProps {
 }
 
 export default function DumpScreen({ onSubmit, error, photoFile, onPhotoChange }: DumpScreenProps) {
-  const [value, setValue] = useState('')
-  const [photoError, setPhotoError] = useState<string | null>(null)
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [showGoogleSheet, setShowGoogleSheet] = useState(false)
-
-  // Revoke object URLs on unmount / photo change using useState so re-renders fire
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (photoFile) {
-      const url = URL.createObjectURL(photoFile)
-      setPreviewUrl(url)
-      return () => URL.revokeObjectURL(url)
-    } else {
-      setPreviewUrl(null)
-    }
-  }, [photoFile])
-
-  const { getInputProps, open } = useDropzone({
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic'] },
-    maxFiles: 1,
-    maxSize: 5 * 1024 * 1024,
-    noClick: true,
-    noKeyboard: true,
-    onDropAccepted: (files) => {
-      setPhotoError(null)
-      onPhotoChange(files[0] ?? null)
-    },
-    onDropRejected: (rejections) => {
-      const code = rejections[0]?.errors[0]?.code
-      if (code === 'file-too-large') {
-        setPhotoError('Photo must be under 5MB')
-      } else {
-        setPhotoError('Unsupported file type — use JPG, PNG, or WEBP')
-      }
-    },
-  })
-
-  const handleAttachTap = useCallback(() => {
-    if (!localStorage.getItem(ONBOARDING_KEY)) {
-      setShowOnboarding(true)
-    } else {
-      open()
-    }
-  }, [open])
-
-  const handleOnboardingConfirm = useCallback(() => {
-    localStorage.setItem(ONBOARDING_KEY, '1')
-    setShowOnboarding(false)
-    // Small delay so dialog fully closes before file picker opens (iOS Safari quirk)
-    setTimeout(() => open(), 50)
-  }, [open])
-
-  const handleOnboardingDismiss = useCallback(() => {
-    setShowOnboarding(false)
-  }, [])
-
-  const handleRemovePhoto = useCallback(() => {
-    onPhotoChange(null)
-    setPhotoError(null)
-  }, [onPhotoChange])
-
-  // Append selected Google Tasks as freeform newline-separated text into the
-  // textarea — these are NOT structured Task objects here, they get parsed by
-  // Claude alongside anything else typed, same as the rest of the dump.
-  const handleGoogleImport = useCallback((googleTasks: Pick<GoogleTask, 'id' | 'title'>[]) => {
-    if (googleTasks.length === 0) return
-    setValue(prev => prev + (prev.trim() ? '\n' : '') + googleTasks.map(t => t.title).join('\n'))
-  }, [])
-
-  const isEmpty = value.trim().length === 0 && photoFile === null
-
-  const handleSubmit = useCallback(() => {
-    if (isEmpty) return
-    onSubmit(value, photoFile ?? undefined)
-  }, [isEmpty, onSubmit, value, photoFile])
-
-  const truncateName = (name: string, max = 24) =>
-    name.length <= max ? name : name.slice(0, max - 3) + '...'
+  // Bumped after a successful parse to clear the shared form. DUMP unmounts on
+  // success anyway, so this stays 0 here — no explicit reset needed.
+  const [resetSignal] = useState(0)
 
   return (
-    <>
-      {/* react-dropzone hidden input — rendered outside visible DOM */}
-      <input {...getInputProps()} />
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '32px 20px',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 600 }}>
+        {/* Wordmark */}
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-accent)', opacity: 0.7, textTransform: 'uppercase', marginBottom: '32px' }}>
+          TaskRoulette
+        </div>
 
-      {/* First-time onboarding modal */}
-      <Dialog open={showOnboarding} onOpenChange={(open) => { if (!open) handleOnboardingDismiss() }}>
-        <DialogContent
+        {/* Heading */}
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
           style={{
-            background: 'var(--color-surface)',
-            border: '1.5px solid var(--color-border)',
-            borderRadius: 'var(--rounded-xl)',
+            fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+            fontWeight: 800,
+            lineHeight: 1.15,
+            letterSpacing: '-0.02em',
             color: 'var(--color-ink)',
-            maxWidth: 400,
-            padding: '28px 24px 24px',
+            marginBottom: 12,
+            textWrap: 'balance',
+          } as React.CSSProperties}
+        >
+          What&apos;s swirling around in your head?
+        </motion.h1>
+
+        {/* Subheading */}
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            fontSize: '1.0625rem',
+            lineHeight: 1.6,
+            color: 'var(--color-ink-muted)',
+            marginBottom: 32,
+            maxWidth: '50ch',
           }}
         >
-          <DialogHeader>
-            <DialogTitle style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--color-ink)' }}>
-              Parse a photo too
-            </DialogTitle>
-            <DialogDescription style={{ color: 'var(--color-ink-muted)', fontSize: '0.9375rem', lineHeight: 1.6, marginTop: 8 }}>
-              Take a photo of a sticky note, whiteboard, or handwritten list. We'll combine it with anything you've typed and find every task inside.
-            </DialogDescription>
-          </DialogHeader>
+          No lists, no formats, no pressure. Just let it all out. We&apos;ll sort it for you.
+        </motion.p>
 
-          {/* Example types */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0 20px' }}>
-            {[
-              { icon: '📋', label: 'Handwritten lists' },
-              { icon: '🗒️', label: 'Sticky notes' },
-              { icon: '📸', label: 'Whiteboard shots' },
-            ].map(({ icon, label }) => (
-              <div
-                key={label}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 14px',
-                  background: 'var(--color-surface2)',
-                  borderRadius: 'var(--rounded-md)',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
-              >
-                <span style={{ fontSize: '1.1rem' }}>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <button
-            type="button"
-            onClick={handleOnboardingConfirm}
-            style={{
-              width: '100%',
-              padding: '14px 0',
-              background: 'var(--color-accent)',
-              color: 'oklch(10% 0.01 30)',
-              border: 'none',
-              borderRadius: 'var(--rounded-md)',
-              fontSize: '1rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              marginBottom: 10,
-            }}
-          >
-            Got it, let me take a photo &rarr;
-          </button>
-
-          {/* Dismiss */}
-          <button
-            type="button"
-            onClick={handleOnboardingDismiss}
-            style={{
-              width: '100%',
-              padding: '10px 0',
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--color-ink-muted)',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            Maybe later
-          </button>
-        </DialogContent>
-      </Dialog>
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        style={{
-          minHeight: '100dvh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: '32px 20px',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: 600 }}>
-          {/* Wordmark */}
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-accent)', opacity: 0.7, textTransform: 'uppercase', marginBottom: '32px' }}>
-            TaskRoulette
-          </div>
-
-          {/* Heading */}
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-            style={{
-              fontSize: 'clamp(1.5rem, 4vw, 2rem)',
-              fontWeight: 800,
-              lineHeight: 1.15,
-              letterSpacing: '-0.02em',
-              color: 'var(--color-ink)',
-              marginBottom: 12,
-              textWrap: 'balance',
-            } as React.CSSProperties}
-          >
-            What&apos;s swirling around in your head?
-          </motion.h1>
-
-          {/* Subheading */}
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            style={{
-              fontSize: '1.0625rem',
-              lineHeight: 1.6,
-              color: 'var(--color-ink-muted)',
-              marginBottom: 32,
-              maxWidth: '50ch',
-            }}
-          >
-            No lists, no formats, no pressure. Just let it all out. We&apos;ll sort it for you.
-          </motion.p>
-
-          {/* Textarea + attach button */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            style={{ marginBottom: 8, position: 'relative' }}
-          >
-            <textarea
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              placeholder="Just type it all out.. emails to send, calls to make, things you've been avoiding.. all of it. Don't worry about order or categories."
-              rows={7}
-              style={{
-                width: '100%',
-                minHeight: 200,
-                background: 'var(--color-surface)',
-                color: 'var(--color-ink)',
-                border: '1.5px solid var(--color-border)',
-                borderRadius: 'var(--rounded-md)',
-                padding: '16px 16px 52px',
-                fontSize: '1rem',
-                lineHeight: 1.7,
-                resize: 'none',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-              onFocus={e => {
-                e.target.style.borderColor = 'var(--color-accent)'
-                e.target.style.boxShadow = '0 0 0 3px oklch(72% 0.2 30 / 0.15)'
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = 'var(--color-border)'
-                e.target.style.boxShadow = 'none'
-              }}
-            />
-
-            {/* Attach photo button — sits inside textarea bottom bar */}
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 12,
-                left: 14,
-                right: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <button
-                type="button"
-                data-testid="attach-photo-btn"
-                onClick={handleAttachTap}
-                aria-label="Attach a photo of a task list"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 10px',
-                  background: 'var(--color-surface2)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--rounded-sm)',
-                  color: photoFile ? 'var(--color-accent)' : 'var(--color-ink-muted)',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'color 0.15s ease',
-                  minHeight: 32,
-                }}
-              >
-                {/* Camera SVG */}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
-                <span>{photoFile ? 'Change photo' : 'Add photo'}</span>
-              </button>
-
-              {/* Add Google Tasks button — opens picker, appends titles as freeform text */}
-              <button
-                type="button"
-                data-testid="add-google-tasks-btn"
-                onClick={() => setShowGoogleSheet(true)}
-                aria-label="Add tasks from Google Tasks"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 10px',
-                  background: 'var(--color-surface2)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--rounded-sm)',
-                  color: 'var(--color-ink-muted)',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'color 0.15s ease',
-                  minHeight: 32,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
-                  <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-                  <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-                  <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
-                  <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
-                </svg>
-                <span>Add Google Tasks</span>
-              </button>
-
-              {/* Photo thumbnail preview */}
-              {photoFile && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '4px 8px 4px 4px',
-                    background: 'var(--color-surface2)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--rounded-sm)',
-                    maxWidth: 160,
-                  }}
-                >
-                  {previewUrl && (
-                    <img
-                      src={previewUrl}
-                      alt="Attached photo preview"
-                      data-testid="photo-preview"
-                      style={{
-                        width: 28,
-                        height: 28,
-                        objectFit: 'cover',
-                        borderRadius: 4,
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                  {!previewUrl && (
-                    <div
-                      data-testid="photo-preview"
-                      aria-label="Attached photo preview"
-                      style={{
-                        width: 28,
-                        height: 28,
-                        background: 'var(--color-border)',
-                        borderRadius: 4,
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--color-ink-muted)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {truncateName(photoFile.name)}
-                  </span>
-                  <button
-                    type="button"
-                    data-testid="remove-photo-btn"
-                    onClick={handleRemovePhoto}
-                    aria-label="Remove attached photo"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--color-ink-muted)',
-                      cursor: 'pointer',
-                      padding: 2,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Photo error */}
-          {photoError && (
-            <motion.p
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              style={{ fontSize: '0.8125rem', color: 'oklch(65% 0.2 25)', marginBottom: 6 }}
-            >
-              {photoError}
-            </motion.p>
-          )}
-
-          {/* Parse error */}
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              role="alert"
-              style={{
-                fontSize: '0.875rem',
-                color: 'oklch(65% 0.2 25)',
-                marginBottom: 8,
-              }}
-            >
-              {error}
-            </motion.p>
-          )}
-
-          {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            style={{ marginTop: 4 }}
-          >
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isEmpty}
-              aria-label="Parse my tasks"
-              style={{
-                background: isEmpty ? 'oklch(22% 0.025 260)' : 'var(--color-accent)',
-                color: isEmpty ? 'oklch(55% 0.02 260)' : 'oklch(10% 0.01 30)',
-                border: isEmpty ? '1.5px solid oklch(30% 0.025 260)' : '1.5px solid transparent',
-                borderRadius: 'var(--rounded-lg)',
-                padding: '0 32px',
-                minHeight: 60,
-                width: '100%',
-                fontSize: '1.0625rem',
-                fontWeight: 700,
-                cursor: isEmpty ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              Parse my tasks &rarr;
-            </button>
-          </motion.div>
-        </div>
-      </motion.div>
-      <GoogleTasksSheet
-        isOpen={showGoogleSheet}
-        onClose={() => setShowGoogleSheet(false)}
-        currentTaskCount={0}
-        onImport={handleGoogleImport}
-      />
-    </>
+        {/* Shared brain-dump input surface */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <BrainDumpForm
+            onSubmit={onSubmit}
+            submitLabel="Parse my tasks &rarr;"
+            error={error}
+            photoFile={photoFile}
+            onPhotoChange={onPhotoChange}
+            enablePhotoOnboarding
+            resetSignal={resetSignal}
+          />
+        </motion.div>
+      </div>
+    </motion.div>
   )
 }

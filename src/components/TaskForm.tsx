@@ -13,6 +13,11 @@ interface TaskFormProps {
   submitLabel?: string
   placeholder?: string
   disabled?: boolean
+  // Visual weight of the submit button. 'primary' = loud accent fill (hero CTA);
+  // 'secondary' = tonal/tinted accent (same color family, quieter) for when this
+  // button competes with a louder primary like "Let's spin". Decoupled from
+  // mode on purpose — visual weight is a layout decision, not tied to add/edit.
+  emphasis?: 'primary' | 'secondary'
 }
 
 export default function TaskForm({
@@ -24,6 +29,7 @@ export default function TaskForm({
   submitLabel,
   placeholder = 'What needs doing?',
   disabled = false,
+  emphasis = 'primary',
 }: TaskFormProps) {
   const [value, setValue] = useState(initialValue)
 
@@ -122,16 +128,30 @@ export default function TaskForm({
         )}
       </AnimatePresence>
 
-      {/* Submit button */}
+      {/* Submit button. Primary = loud accent fill (hero). Secondary = tonal
+          tint of the accent hue (same family, quieter) so it doesn't compete
+          with a louder primary like "Let's spin". Disabled state is shared
+          regardless of tier. Differentiate by FILL only — size/padding/weight
+          stay equal so the tap target and perceived tappability don't change. */}
       <button
         type="button"
         data-submit
         onClick={handleSubmit}
         disabled={!canSubmit}
         style={{
-          background: canSubmit ? 'var(--color-accent)' : 'var(--color-surface2)',
-          color: canSubmit ? 'oklch(10% 0.01 30)' : 'var(--color-ink-muted)',
-          border: 'none',
+          background: !canSubmit
+            ? 'var(--color-surface2)'
+            : emphasis === 'secondary'
+              ? 'oklch(20% 0.05 30)'
+              : 'var(--color-accent)',
+          color: !canSubmit
+            ? 'var(--color-ink-muted)'
+            : emphasis === 'secondary'
+              ? 'var(--color-accent)'
+              : 'oklch(10% 0.01 30)',
+          border: emphasis === 'secondary' && canSubmit
+            ? '1.5px solid oklch(38% 0.1 30)'
+            : '1.5px solid transparent',
           borderRadius: 'var(--rounded-lg)',
           padding: '0 32px',
           minHeight: 54,
@@ -139,7 +159,7 @@ export default function TaskForm({
           fontSize: '1rem',
           fontWeight: 700,
           cursor: canSubmit ? 'pointer' : 'not-allowed',
-          transition: 'background 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: 'background 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {label}
