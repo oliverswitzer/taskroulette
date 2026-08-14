@@ -11,7 +11,7 @@ import WheelScreen from './components/WheelScreen'
 import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
-import AppHomeIcon from './components/AppHomeIcon'
+import AppLayout from './components/AppLayout'
 import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
 import type { AppendResult } from './types'
 import EmailGateModal from './components/EmailGateModal'
@@ -483,6 +483,15 @@ function App() {
       }}
     >
       <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: '100dvh' }}>
+      <AppLayout
+        showHomeIcon={
+          appState === 'LIST_EDIT' ||
+          appState === 'WHEEL_IDLE' ||
+          appState === 'WHEEL_SPINNING' ||
+          appState === 'TASK_CARD'
+        }
+        onHomeIconActivate={() => setShowBackConfirm(true)}
+      >
       <AnimatePresence>
         {appState === 'DUMP' && (
           <motion.div
@@ -627,23 +636,8 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      </AppLayout>
       </div>
-      {/* Global home/start-over icon — rendered ONCE as a fixed top-left
-          overlay (not per-screen) so there's a single confirm wiring. Shown on
-          every pre-completion working screen; tapping opens the reset-confirm
-          dialog below. Hidden on: DUMP (already home — the wordmark is the
-          top-left brand there, nothing to reset), PARSING (transient async —
-          don't interrupt a live parse), and ALL_DONE (past completion;
-          AllDoneScreen owns its own "start fresh" CTA, so a second control +
-          scary confirm there would be worse UX). */}
-      <AnimatePresence>
-        {(appState === 'LIST_EDIT' ||
-          appState === 'WHEEL_IDLE' ||
-          appState === 'WHEEL_SPINNING' ||
-          appState === 'TASK_CARD') && (
-          <AppHomeIcon key="home-icon" onActivate={() => setShowBackConfirm(true)} />
-        )}
-      </AnimatePresence>
       {/* Email gate modal — shown when session limit hit and no email yet */}
       {showEmailModal && (
         <EmailGateModal
@@ -748,12 +742,12 @@ function App() {
           </div>
         </div>
       )}
-      {/* Dev-only reset button — clears localStorage + reloads. Positioned
-          BELOW the global home icon's 44px top-left tap zone (which lives at
-          top:10 left:12, ~54px tall incl. safe-area) so it can't intercept the
-          icon's clicks in dev/E2E. Dev-only, so prod is unaffected regardless. */}
+      {/* Dev-only reset button — clears localStorage + reloads. The global home
+          icon lives in normal document flow (in AppLayout's top bar) now, not
+          fixed, so this only needs to sit clear of the safe-area inset — it
+          can't collide with the icon anymore. Dev-only, so prod is unaffected. */}
       {import.meta.env.DEV && (
-        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 64px)', left: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 8px)', right: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
             onClick={() => { localStorage.clear(); window.location.reload() }}
