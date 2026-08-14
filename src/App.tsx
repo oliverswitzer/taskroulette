@@ -604,7 +604,6 @@ function App() {
                   task={selectedTask}
                   onComplete={handleTaskComplete}
                   onSkip={handleSkip}
-                  onBackToDump={handleBackToDump}
                 />
               )}
             </div>
