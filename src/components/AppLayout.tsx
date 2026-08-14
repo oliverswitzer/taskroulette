@@ -26,6 +26,10 @@ export default function AppLayout({ showHomeIcon, onHomeIconActivate, children }
       <div
         style={{
           height: 44,
+          // Explicit minimum top padding — env(safe-area-inset-top) alone
+          // resolves to 0px on non-notched devices/browsers, which left the
+          // icon flush against the very top edge with no breathing room.
+          marginTop: 12,
           marginBottom: 24,
           padding: '0 20px',
           display: 'flex',
