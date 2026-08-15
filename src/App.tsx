@@ -471,7 +471,14 @@ function App() {
   return (
     <div
       style={{
-        minHeight: '100dvh',
+        // Fixed to the viewport height (not minHeight) — AppLayout's top bar
+        // and each screen's own '100dvh' used to STACK (bar height + a full
+        // extra viewport of screen content), pushing everything down and
+        // clipping the bottom off-screen. Capping the outer box to exactly
+        // one viewport and letting AppLayout's content area fill what's left
+        // (see AppLayout.tsx) keeps the bar + screen together inside one
+        // viewport, with internal scrolling if content overflows.
+        height: '100dvh',
         background: 'var(--color-base)',
         color: 'var(--color-ink)',
         fontFamily: 'Inter, system-ui, sans-serif',
@@ -482,7 +489,7 @@ function App() {
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 480, position: 'relative', minHeight: '100dvh' }}>
+      <div style={{ width: '100%', maxWidth: 480, position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <AppLayout
         showHomeIcon={
           appState === 'LIST_EDIT' ||
