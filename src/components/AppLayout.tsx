@@ -26,6 +26,7 @@ export default function AppLayout({ showHomeIcon, onHomeIconActivate, children }
       <div
         style={{
           height: 44,
+          flexShrink: 0,
           // Explicit minimum top padding — env(safe-area-inset-top) alone
           // resolves to 0px on non-notched devices/browsers, which left the
           // icon flush against the very top edge with no breathing room.
@@ -40,7 +41,14 @@ export default function AppLayout({ showHomeIcon, onHomeIconActivate, children }
           {showHomeIcon && <AppHomeIcon key="home-icon" onActivate={onHomeIconActivate} />}
         </AnimatePresence>
       </div>
-      {children}
+      {/* Fills whatever height the top bar didn't use, and scrolls internally
+          if a screen's content is taller than the remaining space — each
+          screen still sets its own min-height:100dvh, but this wrapper's
+          overflow:auto is what stops that height from ADDING to the bar's
+          height and pushing content off the bottom of a fixed-height parent. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {children}
+      </div>
     </>
   )
 }
