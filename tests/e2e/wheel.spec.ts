@@ -187,7 +187,15 @@ test.describe('Wheel slice click popover', () => {
 
     // Click far outside the wheel/popover
     await page.mouse.click(10, 10)
-    await expect(page.locator('[data-testid="slice-popover"]')).not.toBeVisible()
+    // Assert on DOM removal (toHaveCount(0)), not not.toBeVisible() — the
+    // popover exit animation is a framer-motion spring (variable duration,
+    // not a fixed CSS transition), and Playwright's visibility check does
+    // NOT treat mid-fade opacity as hidden. That raced not.toBeVisible()
+    // against the spring settling, flaking this test in CI even though the
+    // dismiss behavior itself was correct. Waiting for full unmount (which
+    // only happens once AnimatePresence's exit animation completes) is the
+    // actual "is it gone" signal.
+    await expect(page.locator('[data-testid="slice-popover"]')).toHaveCount(0, { timeout: 8000 })
   })
 
   test('popover stays fully within the viewport when clicking a slice on the right side', async ({ page }) => {
