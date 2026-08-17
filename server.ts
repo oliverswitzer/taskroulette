@@ -87,10 +87,72 @@ async function upsertLoopsContact(contact: LoopsContact): Promise<{ ok: true } |
   return { ok: true }
 }
 
+// ── Google OAuth token refresh (shared by email-gate submit + Google Tasks) ──
+
+type GoogleRefreshResult =
+  | { ok: true; accessToken: string; expiresIn: number }
+  | { ok: false; error: string; status: number }
+
+async function refreshGoogleAccessToken(refreshToken: string): Promise<GoogleRefreshResult> {
+  const clientId = process.env['GOOGLE_CLIENT_ID']
+  const clientSecret = process.env['GOOGLE_CLIENT_SECRET']
+  if (!clientId || !clientSecret) {
+    return { ok: false, error: 'Google OAuth not configured', status: 500 }
+  }
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    console.error('Google token refresh error:', res.status, text)
+    // Google returns 400 invalid_grant when the refresh token itself is dead
+    // (revoked, expired from inactivity, or never issued as offline) — that's
+    // the ONE case where the frontend genuinely has to send the user back
+    // through full consent. Anything else is treated as a transient failure.
+    const status = res.status === 400 ? 401 : 502
+    return { ok: false, error: 'Failed to refresh Google access token', status }
+  }
+
+  const data = await res.json() as { access_token: string; expires_in: number }
+  return { ok: true, accessToken: data.access_token, expiresIn: data.expires_in }
+}
+
 export function createApp() {
   const currentApp = new Hono()
 
   currentApp.use('/*', cors({ origin: '*' }))
+
+  // Called by the frontend when a cached Google access token has expired
+  // (~1hr) but the user is still within their Supabase session. Exchanges
+  // the long-lived provider_refresh_token (captured at initial consent via
+  // access_type=offline) for a fresh access token — no re-consent needed.
+  // This is the fix for "have to re-auth with Google every day": before this
+  // endpoint existed, an expired access token had no recovery path other
+  // than sending the user through the full OAuth consent screen again.
+  currentApp.post('/api/google/refresh-token', async (c) => {
+    try {
+      const body = await c.req.json<{ refreshToken?: string }>()
+      if (!body.refreshToken?.trim()) {
+        return c.json({ error: 'refreshToken required' }, 400)
+      }
+      const result = await refreshGoogleAccessToken(body.refreshToken.trim())
+      if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 500 | 502)
+      return c.json({ accessToken: result.accessToken, expiresIn: result.expiresIn })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('google/refresh-token error:', msg)
+      return c.json({ error: msg }, 500)
+    }
+  })
 
   currentApp.post('/api/parse', async (c) => {
     try {
