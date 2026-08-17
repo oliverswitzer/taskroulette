@@ -59,11 +59,15 @@ test.describe('Global home icon + reset confirm', () => {
     expect(count).toBe(2)
   })
 
-  test('icon is HIDDEN on the dump screen (already home) and on all-done', async ({ page }) => {
-    // Dump screen — fresh load.
+  test('icon is present but non-interactive on the dump screen (already home) and on all-done', async ({ page }) => {
+    // Dump screen — fresh load. Logo now renders on EVERY screen (branding),
+    // but only ACTS as a "start over" control on screens where that makes
+    // sense — DUMP/ALL_DONE render it as plain, non-clickable branding.
     await page.goto('/')
     await expect(page.getByRole('textbox')).toBeVisible({ timeout: 8000 })
-    await expect(page.getByTestId('app-home-icon')).toHaveCount(0)
+    const dumpIcon = page.getByTestId('app-home-icon')
+    await expect(dumpIcon).toBeVisible()
+    await expect(dumpIcon).not.toHaveJSProperty('tagName', 'BUTTON')
 
     // All-done screen.
     await page.evaluate(() => {
@@ -71,6 +75,8 @@ test.describe('Global home icon + reset confirm', () => {
       ;(window as Window & typeof globalThis & { __setCompletedCount?: (n: number) => void }).__setCompletedCount?.(3)
     })
     await expect(page.locator('[data-testid="all-done-screen"]')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByTestId('app-home-icon')).toHaveCount(0)
+    const allDoneIcon = page.getByTestId('app-home-icon')
+    await expect(allDoneIcon).toBeVisible()
+    await expect(allDoneIcon).not.toHaveJSProperty('tagName', 'BUTTON')
   })
 })

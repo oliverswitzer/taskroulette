@@ -17,7 +17,6 @@ interface WheelScreenProps {
   tasks: Task[]
   onSpinStart?: () => void
   onTaskSelected: (task: Task, index: number, finalAngle: number) => void
-  onEditTasks: () => void
   autoSpinRef?: React.MutableRefObject<boolean>
   autoSpinSignal?: number
   frozen?: boolean
@@ -39,7 +38,6 @@ export default function WheelScreen({
   tasks,
   onSpinStart,
   onTaskSelected,
-  onEditTasks,
   autoSpinRef: _autoSpinRef,
   autoSpinSignal = 0,
   frozen = false,
@@ -226,23 +224,19 @@ export default function WheelScreen({
         overflow: frozen ? 'visible' : 'hidden',
       }}
     >
-      {/* Top bar */}
+      {/* Top bar — just the task-count badge now. The edit-tasks button moved
+          up into AppLayout's header row (same row as the logo) — see
+          App.tsx's headerRight prop — so it's no longer duplicated here. */}
       <div
         style={{
           width: '100%',
           maxWidth: 400,
           display: frozen ? 'none' : 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '20px 0 16px',
+          justifyContent: 'center',
+          padding: '4px 0 16px',
         }}
       >
-        {/* Left spacer — keeps the task-count badge centered now that the
-            in-app "Dump" back link is gone (replaced by the global app-icon
-            overlay in App.tsx). Matches the edit button's 44px width on the
-            right so the badge sits truly centered. */}
-        <div style={{ width: 44, flexShrink: 0 }} aria-hidden="true" />
-
         {/* Task count badge */}
         <span
           style={{
@@ -258,31 +252,6 @@ export default function WheelScreen({
         >
           {activeBadgeCount}/{MAX_TASKS} tasks
         </span>
-
-        {/* Edit button — hidden while spinning */}
-        <button
-          type="button"
-          data-testid="edit-tasks-btn"
-          onClick={onEditTasks}
-          aria-label="Edit tasks"
-          style={{
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--rounded-md)',
-            width: 44,
-            height: 44,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'var(--color-ink-muted)',
-            opacity: isSpinning ? 0 : 1,
-            pointerEvents: isSpinning ? 'none' : 'auto',
-            transition: 'opacity 0.2s ease',
-          }}
-        >
-          <PencilIcon />
-        </button>
       </div>
 
       {/* Wheel canvas */}
@@ -505,21 +474,3 @@ function PopoverOption({
   )
 }
 
-function PencilIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  )
-}
