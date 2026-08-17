@@ -12,6 +12,7 @@ import TaskCard from './components/TaskCard'
 import EditModal from './components/EditModal'
 import AllDoneScreen from './components/AllDoneScreen'
 import AppLayout from './components/AppLayout'
+import PencilIcon from './components/PencilIcon'
 import { parseTasks, parseTasksFromImage, getSessionStatus, recordSessionComplete } from './api'
 import type { AppendResult } from './types'
 import EmailGateModal from './components/EmailGateModal'
@@ -491,6 +492,30 @@ function App() {
           appState === 'TASK_CARD'
         }
         onHomeIconActivate={() => setShowBackConfirm(true)}
+        headerRight={
+          appState === 'WHEEL_IDLE' ? (
+            <button
+              type="button"
+              data-testid="edit-tasks-btn"
+              onClick={handleOpenEdit}
+              aria-label="Edit tasks"
+              style={{
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--rounded-md)',
+                width: 44,
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--color-ink-muted)',
+              }}
+            >
+              <PencilIcon />
+            </button>
+          ) : undefined
+        }
       >
       <AnimatePresence>
         {appState === 'DUMP' && (
@@ -563,7 +588,6 @@ function App() {
               tasks={activeTasks}
               onSpinStart={handleSpinStart}
               onTaskSelected={handleTaskSelected}
-              onEditTasks={handleOpenEdit}
               autoSpinSignal={autoSpinSignal}
               frozen={appState === 'TASK_CARD'}
               frozenAngle={wheelAngle}
@@ -742,12 +766,14 @@ function App() {
           </div>
         </div>
       )}
-      {/* Dev-only reset button — clears localStorage + reloads. The global home
-          icon lives in normal document flow (in AppLayout's top bar) now, not
-          fixed, so this only needs to sit clear of the safe-area inset — it
-          can't collide with the icon anymore. Dev-only, so prod is unaffected. */}
+      {/* Dev-only reset button — clears localStorage + reloads. Positioned
+          BELOW the app header row (not flush with the top-right corner)
+          because the edit-tasks button now lives in that same header row
+          (see AppLayout's headerRight) — sharing the corner made this fixed
+          overlay intercept clicks meant for the edit button. Dev-only, so
+          prod is unaffected. */}
       {import.meta.env.DEV && (
-        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 8px)', right: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 64px)', right: 8, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
             type="button"
             onClick={() => { localStorage.clear(); window.location.reload() }}
