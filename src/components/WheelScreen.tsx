@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import useSound from 'use-sound'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Task } from '../types'
@@ -311,100 +312,119 @@ export default function WheelScreen({
         />
       </motion.div>
 
-      {/* Slice click popover — Set active / Mark complete / Delete */}
-      <AnimatePresence>
-        {slicePopover && popoverTask && (
-          <>
-            {/* Backdrop — dismiss on outside tap */}
-            <motion.div
-              key="slice-popover-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={closeSlicePopover}
-              style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'transparent' }}
-            />
-            <motion.div
-              key="slice-popover"
-              data-testid="slice-popover"
-              initial={{ opacity: 0, scale: 0.92, y: -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: -4 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-              style={{
-                position: 'fixed',
-                // Fixed width (not just minWidth) so the header text's
-                // whiteSpace:nowrap + ellipsis truncation actually has
-                // something to truncate against — without a max width, a
-                // long task name stretched the popover wider than the
-                // clamp math assumed, pushing it off the right edge on
-                // mobile ("Create Postiz app account" bug).
-                width: POPOVER_WIDTH,
-                // Left edge computed directly (not centered via CSS
-                // transform) — framer-motion drives its own `transform`
-                // from the animate/initial scale+y values and silently
-                // overwrites any translate(-50%) set via the style prop,
-                // which is what broke the on-screen clamping here: the
-                // math looked centered but the actual rendered position
-                // ignored the -50% shift entirely.
-                left: Math.min(
-                  Math.max(slicePopover.x - POPOVER_WIDTH / 2, 8),
-                  window.innerWidth - POPOVER_WIDTH - 8
-                ),
-                top: Math.min(Math.max(slicePopover.y, 20), window.innerHeight - 160),
-                zIndex: 61,
-                background: 'oklch(18% 0.025 260)',
-                border: '1px solid oklch(30% 0.025 260)',
-                borderRadius: 14,
-                padding: 6,
-                boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div
+      {/* Slice click popover — Set active / Mark complete / Delete.
+          Portaled to document.body (createPortal) rather than rendered
+          in-tree: WheelScreen sits inside App.tsx's animated page-transition
+          motion.div, and while that ancestor's `transform` style is active
+          (framer-motion drives it during page transitions) it becomes the
+          CSS containing block for any descendant `position: fixed` element
+          per spec — so the backdrop's `inset: 0` no longer covers the real
+          viewport, just the ancestor's box. That silently broke "tap
+          outside to dismiss" for taps that landed outside the ancestor's
+          (possibly still-animating/offset) box but inside the true
+          viewport — this is what caused the CI-only "popover dismisses
+          when tapping outside" flake (real viewport there is unthrottled/
+          consistent size, but the race window depends on exact transform
+          timing, which is much more sensitive to CI's timing jitter).
+          Escaping to document.body via a portal removes it from that
+          ancestor chain entirely, so `position: fixed` is always relative
+          to the true viewport regardless of any animation in progress. */}
+      {createPortal(
+        <AnimatePresence>
+          {slicePopover && popoverTask && (
+            <>
+              {/* Backdrop — dismiss on outside tap */}
+              <motion.div
+                key="slice-popover-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={closeSlicePopover}
+                style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'transparent' }}
+              />
+              <motion.div
+                key="slice-popover"
+                data-testid="slice-popover"
+                initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 340 }}
                 style={{
-                  padding: '10px 12px 6px',
-                  fontSize: 12,
-                  color: 'oklch(55% 0.02 260)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  position: 'fixed',
+                  // Fixed width (not just minWidth) so the header text's
+                  // whiteSpace:nowrap + ellipsis truncation actually has
+                  // something to truncate against — without a max width, a
+                  // long task name stretched the popover wider than the
+                  // clamp math assumed, pushing it off the right edge on
+                  // mobile ("Create Postiz app account" bug).
+                  width: POPOVER_WIDTH,
+                  // Left edge computed directly (not centered via CSS
+                  // transform) — framer-motion drives its own `transform`
+                  // from the animate/initial scale+y values and silently
+                  // overwrites any translate(-50%) set via the style prop,
+                  // which is what broke the on-screen clamping here: the
+                  // math looked centered but the actual rendered position
+                  // ignored the -50% shift entirely.
+                  left: Math.min(
+                    Math.max(slicePopover.x - POPOVER_WIDTH / 2, 8),
+                    window.innerWidth - POPOVER_WIDTH - 8
+                  ),
+                  top: Math.min(Math.max(slicePopover.y, 20), window.innerHeight - 160),
+                  zIndex: 61,
+                  background: 'oklch(18% 0.025 260)',
+                  border: '1px solid oklch(30% 0.025 260)',
+                  borderRadius: 14,
+                  padding: 6,
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
                 }}
               >
-                {popoverTask.text}
-              </div>
-              <PopoverOption
-                testId="slice-popover-set-active"
-                label="Set as active task"
-                accent
-                onClick={() => {
-                  onSetActiveTask?.(popoverTask, slicePopover.index)
-                  closeSlicePopover()
-                }}
-              />
-              <PopoverOption
-                testId="slice-popover-mark-complete"
-                label="Mark as complete"
-                onClick={() => {
-                  onMarkComplete?.(popoverTask.id)
-                  closeSlicePopover()
-                }}
-              />
-              <PopoverOption
-                testId="slice-popover-delete"
-                label="Delete"
-                danger
-                onClick={() => {
-                  onDeleteTask?.(popoverTask.id)
-                  closeSlicePopover()
-                }}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                <div
+                  style={{
+                    padding: '10px 12px 6px',
+                    fontSize: 12,
+                    color: 'oklch(55% 0.02 260)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {popoverTask.text}
+                </div>
+                <PopoverOption
+                  testId="slice-popover-set-active"
+                  label="Set as active task"
+                  accent
+                  onClick={() => {
+                    onSetActiveTask?.(popoverTask, slicePopover.index)
+                    closeSlicePopover()
+                  }}
+                />
+                <PopoverOption
+                  testId="slice-popover-mark-complete"
+                  label="Mark as complete"
+                  onClick={() => {
+                    onMarkComplete?.(popoverTask.id)
+                    closeSlicePopover()
+                  }}
+                />
+                <PopoverOption
+                  testId="slice-popover-delete"
+                  label="Delete"
+                  danger
+                  onClick={() => {
+                    onDeleteTask?.(popoverTask.id)
+                    closeSlicePopover()
+                  }}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Spin button */}
       <div
