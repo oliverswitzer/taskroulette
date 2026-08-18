@@ -73,7 +73,7 @@
     </a>
 
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: August 10, 2026</p>
+    <p class="updated">Last updated: August 18, 2026</p>
 
     <p>
       TaskRoulette ("we", "the app") is a simple task-picking tool: you dump your
@@ -89,7 +89,7 @@
       <li><strong>Google Tasks (optional).</strong> If you choose to connect Google Tasks, we request
         read-only access (<code>tasks.readonly</code>) via Google OAuth (handled by Supabase Auth) so you
         can import existing tasks into TaskRoulette. We never write to, modify, or delete anything in your
-        Google Tasks account. We only read task titles and due dates to show you a picker.</li>
+        Google Tasks account. We only read task titles, due dates, and list names to show you a picker.</li>
       <li><strong>Email address (optional).</strong> If you sign in with Google or submit your email to keep
         using the app past the free session limit, we store your email (and first/last name, if provided by
         Google) in Loops, our email service provider, so we can send you occasional product updates. You can
@@ -99,36 +99,114 @@
         other identifying information.</li>
     </ul>
 
+    <h2>How we use Google user data</h2>
+    <p>
+      Google user data (specifically, your Google Tasks titles, due dates, and list names, obtained via the
+      read-only <code>tasks.readonly</code> scope) is used <strong>solely</strong> to display those tasks to
+      you inside TaskRoulette's task list and spinning wheel, so you can pick from your existing Google Tasks
+      alongside anything you've typed or dumped in manually. We do not use Google user data for advertising,
+      profiling, analytics, AI model training, or any purpose beyond showing it back to you in the app. Your
+      Google OAuth access token and refresh token are used only to make read requests to the Google Tasks
+      API on your behalf — never to log in elsewhere, never to access any other Google product or scope, and
+      never to modify or delete anything in your Google account.
+    </p>
+    <p>
+      TaskRoulette's use and transfer of information received from Google APIs to any other app adheres to
+      the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
+      including the Limited Use requirements.
+    </p>
+
+    <h2>Who we share Google user data with</h2>
+    <p>
+      We do not sell, rent, or share your Google user data with advertisers, data brokers, or any other
+      third party for their own purposes. Google user data passes through the following parties, and only
+      as strictly necessary to make the feature work:
+    </p>
+    <ul>
+      <li><strong>Google</strong> — the source of the data. Our backend server calls Google's own token
+        endpoint (<code>oauth2.googleapis.com</code>) to exchange your refresh token for a fresh access
+        token when the short-lived one expires. No Google data is sent anywhere else during this exchange.</li>
+      <li><strong>Supabase Auth</strong> — brokers the OAuth login handshake itself (redirecting you to
+        Google and back) and briefly holds your Google session token client-side so the app can call the
+        Google Tasks API. Supabase does not receive your Google Tasks content.</li>
+      <li><strong>Our own backend server</strong> (Hono, hosted on Vercel) — holds the Google OAuth client
+        secret needed to refresh your access token, and proxies that one refresh request to Google. It does
+        not read, log, or store your Google Tasks content, and does not persist your refresh token — that
+        stays in your browser only (see Data retention below).</li>
+    </ul>
+    <p>
+      We do <strong>not</strong> send Google Tasks content to Anthropic (Claude) or to Loops. Anthropic only
+      ever sees the free-text brain dump or photo you type/upload yourself — never your imported Google
+      Tasks. Loops only ever receives an email address and name, never task content.
+    </p>
+
+    <h2>Data protection for sensitive data</h2>
+    <p>
+      All communication between your browser, our server, Supabase, and Google happens over HTTPS/TLS —
+      Google user data is never sent in plaintext over the network. Your Google OAuth access token lives
+      only in your browser's memory for the length of your session and is never written to disk or sent to
+      our server. Your Google OAuth refresh token is stored in your browser's local storage only — it is
+      never stored in a database on our servers. The Google OAuth client secret (needed to mint fresh
+      access tokens) is kept exclusively as a server-side environment variable and is never exposed to the
+      browser, logged, or committed to source control. Our backend does not log Google Tasks content or
+      OAuth tokens.
+    </p>
+
+    <h2>Retention and deletion of Google user data</h2>
+    <ul>
+      <li><strong>Access tokens</strong> (~1 hour lifespan, issued by Google) live only in browser memory
+        and are discarded automatically when the tab closes or the token expires — we never persist them.</li>
+      <li><strong>Refresh tokens</strong> are kept in your browser's local storage only for as long as you
+        stay connected. They are deleted immediately when you disconnect Google Tasks from within the app,
+        sign out, or revoke access from your
+        <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google account permissions page</a>
+        (which also invalidates the token on Google's side, so it can no longer be used even if a copy
+        somehow remained).</li>
+      <li><strong>Task titles/due dates/list names</strong> fetched from Google Tasks are held in browser
+        memory to render the picker and are not persisted by us beyond your session, unless you manually add
+        one to your TaskRoulette list — at which point it's stored the same way any manually-typed task is
+        (in your browser's local storage), until you delete it or clear your browser data.</li>
+      <li>You can request full deletion of any data we do hold (your email in Loops) at any time — see
+        Contact below. Since we don't store Google Tasks content or tokens on our servers, there is nothing
+        server-side for us to delete on that front — disconnecting in the app or from your Google account
+        permissions page fully removes it.</li>
+    </ul>
+
     <h2>What we don't do</h2>
     <ul>
       <li>We don't sell your data.</li>
       <li>We don't use your task content for anything other than parsing it into a list for you.</li>
-      <li>We don't share your Google account data with any third party except Anthropic (to parse text/photos
-        you submit) and Supabase (to handle the OAuth login flow itself).</li>
+      <li>We don't share your Google account data with any third party except Google itself (to refresh
+        your access token) and Supabase (to handle the OAuth login flow itself) — see "Who we share Google
+        user data with" above for detail.</li>
     </ul>
 
     <h2>Where your data lives</h2>
     <p>
       Your task list, wheel state, and completion history are stored in your browser's local storage — not
       on our servers. Clearing your browser data or using a different device/browser will start you fresh.
-      Your email (if submitted) is stored in Loops. Your Google OAuth session is managed by Supabase Auth.
+      Your email (if submitted) is stored in Loops. Your Google OAuth session is managed by Supabase Auth,
+      and your Google refresh token is stored in your browser's local storage only (see above).
     </p>
 
     <h2>Third-party services we use</h2>
     <ul>
-      <li><strong>Anthropic (Claude)</strong> — parses your brain-dump text/photos into a task list.</li>
+      <li><strong>Anthropic (Claude)</strong> — parses your brain-dump text/photos into a task list. Never
+        receives your Google Tasks content.</li>
       <li><strong>Google Tasks API</strong> — read-only task import, only if you opt in.</li>
       <li><strong>Supabase Auth</strong> — handles the Google OAuth login flow.</li>
-      <li><strong>Loops</strong> — email delivery for product updates, only if you submit your email.</li>
+      <li><strong>Loops</strong> — email delivery for product updates, only if you submit your email. Never
+        receives your Google Tasks content.</li>
       <li><strong>Vercel</strong> — hosting.</li>
     </ul>
 
     <h2>Your choices</h2>
     <p>
-      You can disconnect Google Tasks access at any time from your
-      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google account permissions page</a>.
-      You can clear all locally stored task data from within the app, or by clearing your browser's site data
-      for taskroulette.vercel.app.
+      You can disconnect Google Tasks access at any time from within the app, or from your
+      <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google account permissions page</a>
+      — either immediately deletes your locally-stored refresh token and revokes our ability to access your
+      Google Tasks. You can clear all locally stored task data from within the app, or by clearing your
+      browser's site data for taskroulette.vercel.app.
     </p>
 
     <h2>Contact</h2>
