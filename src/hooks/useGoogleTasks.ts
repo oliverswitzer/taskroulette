@@ -125,6 +125,21 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Mirror the current tasks into a ref so async callbacks (the fetch error
+  // path) can read the latest list synchronously without stale-closure issues.
+  // Used to decide whether a *refresh* failure should wipe the drawer (no
+  // cached data → full error screen) or keep the last-known list visible with
+  // just an inline error (transient blip while we already have tasks to show).
+  const tasksRef = useRef<GoogleTask[]>([])
+  useEffect(() => {
+    tasksRef.current = tasks
+  }, [tasks])
+
+  // Monotonic id so a slow in-flight fetch can't stomp a newer one. When the
+  // user opens the drawer, closes, and reopens quickly, two fetches may be in
+  // flight; only the most recent one is allowed to write state.
+  const fetchIdRef = useRef(0)
+
   // Persisted Google OAuth refresh token — see module doc comment. Mirrored
   // into a ref (not just localStorage) so the fetch/refresh path always
   // reads the latest value synchronously without a storage round-trip.
@@ -148,41 +163,55 @@ export function useGoogleTasks(): UseGoogleTasksReturn {
   // Only falls through to 'error'/idle (forcing re-login) when there's no
   // refresh token to try, or Google confirms it's dead (revoked/expired).
   const fetchTasks = useCallback(async (accessToken: string) => {
+    const fetchId = ++fetchIdRef.current
+    // Only the most recent fetch may write state — guards against a slow
+    // in-flight request landing after a newer one (rapid open/close/reopen).
+    const isStale = () => fetchId !== fetchIdRef.current
+    // A refresh failure with data already on screen shouldn't wipe the drawer:
+    // surface the error inline but keep the last-known list visible. Only fall
+    // back to the full-screen error/idle state when there's nothing cached.
+    const hasCachedTasks = () => tasksRef.current.length > 0
+
     setIsLoading(true)
     setError(null)
     try {
       const fetched = await fetchAllGoogleTasks(accessToken)
+      if (isStale()) return
       setTasks(sortTasksByDue(fetched))
       setAuthState('authenticated')
     } catch (err) {
+      if (isStale()) return
       if (err instanceof GoogleAuthExpiredError) {
         const refreshToken = refreshTokenRef.current
         if (!refreshToken) {
           setError('Your Google session expired. Please reconnect.')
-          setAuthState('idle')
+          if (!hasCachedTasks()) setAuthState('idle')
           return
         }
         const refreshed = await refreshGoogleAccessToken(refreshToken)
+        if (isStale()) return
         if (!refreshed.ok) {
           if (refreshed.expired) clearRefreshToken()
           setError(refreshed.error)
-          setAuthState('idle')
+          if (!hasCachedTasks()) setAuthState('idle')
           return
         }
         try {
           const fetched = await fetchAllGoogleTasks(refreshed.accessToken)
+          if (isStale()) return
           setTasks(sortTasksByDue(fetched))
           setAuthState('authenticated')
         } catch (retryErr) {
+          if (isStale()) return
           setError(retryErr instanceof Error ? retryErr.message : String(retryErr))
-          setAuthState('error')
+          if (!hasCachedTasks()) setAuthState('error')
         }
         return
       }
       setError(err instanceof Error ? err.message : String(err))
-      setAuthState('error')
+      if (!hasCachedTasks()) setAuthState('error')
     } finally {
-      setIsLoading(false)
+      if (!isStale()) setIsLoading(false)
     }
   }, [clearRefreshToken])
 

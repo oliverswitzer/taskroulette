@@ -5,7 +5,7 @@
  * Behavior: slides up over ListEditScreen. First shows the user's Google task
  * LISTS; tapping a list drills into its incomplete tasks, sorted soonest-due-first.
  */
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { GoogleTask } from '../types'
 import { useGoogleTasks } from '../hooks/useGoogleTasks'
@@ -28,9 +28,31 @@ export default function GoogleTasksSheet({
   currentTaskCount,
   onImport,
 }: GoogleTasksSheetProps) {
-  const { authState, tasks, isLoading, error, isMockMode, login, logout } = useGoogleTasks()
+  const { authState, tasks, isLoading, error, isMockMode, login, logout, refetch } = useGoogleTasks()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
+
+  // Refetch on the rising edge of isOpen so the drawer always reflects the
+  // user's live Google Tasks, never a snapshot from first mount. Edge-triggered
+  // (not fired every render) via a prev-open ref, and gated on an authenticated
+  // session — opening while logged out should show the Connect screen, not fire
+  // a doomed fetch. refetch is a stable useCallback, so keying the effect on it
+  // is safe and won't loop.
+  const prevOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !prevOpenRef.current && authState === 'authenticated') {
+      void refetch()
+    }
+    prevOpenRef.current = isOpen
+  }, [isOpen, authState, refetch])
+
+  // First-ever load (nothing cached yet) → full loading screen. A refresh while
+  // we already have tasks on screen → subtle overlay, list stays visible.
+  const isFirstLoad = isLoading && tasks.length === 0
+  const isRefreshing = isLoading && tasks.length > 0
+  // A transient error while cached tasks are still on screen → inline banner,
+  // don't wipe the list. Only the full ErrorState (authState==='error') blanks.
+  const showInlineError = !!error && tasks.length > 0 && authState === 'authenticated'
 
   const slotsUsed = currentTaskCount + selected.size
   const slotsLeft = MAX_TASKS - slotsUsed
@@ -154,19 +176,23 @@ export default function GoogleTasksSheet({
             </div>
 
             {/* Body — scrollable */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 80px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 80px', position: 'relative' }}>
               {authState === 'idle' && (
                 <IdleState onLogin={login} isLoading={isLoading} />
-              )}
-              {authState === 'loading' && isLoading && (
-                <LoadingState />
               )}
               {authState === 'error' && (
                 <ErrorState error={error} onRetry={login} />
               )}
               {authState === 'authenticated' && (
                 <>
-                  {listGroups.length === 0 ? (
+                  {/* Inline error banner — shown when a refresh fails but we
+                      still have a cached list to display. Doesn't wipe the list. */}
+                  {showInlineError && (
+                    <InlineErrorBanner error={error} onRetry={refetch} />
+                  )}
+                  {isFirstLoad ? (
+                    <LoadingState />
+                  ) : listGroups.length === 0 ? (
                     <EmptyState onLogout={logout} />
                   ) : selectedGroup === null ? (
                     /* View 1 — list picker */
@@ -219,6 +245,11 @@ export default function GoogleTasksSheet({
                   )}
                 </>
               )}
+
+              {/* Refresh overlay — non-blocking spinner shown over the existing
+                  list while a refresh-on-open is in flight. The list stays
+                  visible (and dimmed) underneath rather than blanking out. */}
+              {isRefreshing && <RefreshOverlay />}
             </div>
 
             {/* Sticky CTA */}
@@ -484,6 +515,85 @@ function LoadingState() {
   return (
     <div style={{ padding: '64px 24px', textAlign: 'center', color: 'oklch(60% 0.02 260)' }}>
       Loading your tasks…
+    </div>
+  )
+}
+
+// Non-blocking overlay shown over the existing list during a refresh-on-open.
+// The cached list stays visible (dimmed) underneath so the drawer never flashes
+// to a blank screen just because you reopened it.
+function RefreshOverlay() {
+  return (
+    <div
+      data-testid="google-refresh-overlay"
+      style={{
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        padding: '10px 0',
+        background: 'oklch(18% 0.025 260 / 0.85)',
+        backdropFilter: 'blur(2px)',
+        color: 'oklch(72% 0.02 260)',
+        fontSize: 13,
+        fontWeight: 500,
+        zIndex: 5,
+      }}
+    >
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+        style={{
+          width: 14, height: 14, borderRadius: '50%',
+          border: '2px solid oklch(40% 0.02 260)',
+          borderTopColor: 'oklch(72% 0.2 30)',
+        }}
+      />
+      Refreshing…
+    </div>
+  )
+}
+
+// Inline error banner shown above a still-visible cached list when a refresh
+// fails. Keeps the last-known tasks on screen instead of wiping the drawer.
+function InlineErrorBanner({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  return (
+    <div
+      data-testid="google-inline-error"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        margin: '8px 16px',
+        padding: '10px 14px',
+        background: 'oklch(30% 0.08 15 / 0.35)',
+        border: '1px solid oklch(45% 0.12 15)',
+        borderRadius: 10,
+      }}
+    >
+      <span style={{ fontSize: 13, color: 'oklch(78% 0.12 15)', minWidth: 0 }}>
+        {error ?? "Couldn't refresh — showing last loaded tasks"}
+      </span>
+      <button
+        onClick={onRetry}
+        data-testid="google-inline-retry"
+        style={{
+          flexShrink: 0,
+          padding: '6px 14px',
+          background: 'oklch(72% 0.2 30)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        Retry
+      </button>
     </div>
   )
 }
