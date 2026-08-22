@@ -64,12 +64,6 @@ function fileToBase64(file: File): Promise<string> {
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks())
-  // Measured (not guessed) height of the TaskCard bottom sheet, so the wheel's
-  // reserved bottom space always exactly matches the real card — no matter how
-  // short or long the active task's text is, or how big the device's safe-area
-  // insets are. Falls back to a reasonable default before the first measurement.
-  const [taskCardHeight, setTaskCardHeight] = useState(260)
-  const taskCardRef = useRef<HTMLDivElement>(null)
   const [sessionLimitMsg, setSessionLimitMsg] = useState<string | null>(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
 
@@ -142,21 +136,6 @@ function App() {
   // memoized — to compute cap/overflow correctly.
   const tasksRef = useRef(tasks)
   useEffect(() => { tasksRef.current = tasks }, [tasks])
-
-  // Measure the real TaskCard height whenever it's mounted/resizes (task text
-  // length, safe-area insets, and font rendering all affect the actual height —
-  // a hardcoded guess drifted from reality and either left a big dead gap above
-  // the card or clipped its bottom content like the "skip for now" link).
-  useEffect(() => {
-    const node = taskCardRef.current
-    if (!node) return
-    const observer = new ResizeObserver(entries => {
-      const height = entries[0]?.contentRect.height
-      if (height) setTaskCardHeight(height)
-    })
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [appState, selectedTask])
 
   // ── History management — back-button navigation ───────────────────────────
   const historyHandlers = {
@@ -582,21 +561,39 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
-            style={{ position: 'absolute', width: '100%' }}
+            // Fill the wrapper top-to-bottom (top:0/bottom:0) so this flex
+            // column has a DEFINITE height — without it, the box was
+            // content-sized + bottom-anchored, so the inner `flex:1` had no
+            // slack to grow into and all excess space piled up ABOVE the wheel
+            // (the "too much top margin" bug). paddingTop clears the AppLayout
+            // header (height 44 + 12+12 margins = 68px) which is a flow sibling
+            // above these absolutely-positioned pages; box-sizing:border-box so
+            // that padding eats into the 100% height instead of overflowing it.
+            style={{
+              position: 'absolute',
+              width: '100%',
+              top: 0,
+              bottom: 0,
+              paddingTop: 68,
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
           >
-            <WheelScreen
-              tasks={activeTasks}
-              onSpinStart={handleSpinStart}
-              onTaskSelected={handleTaskSelected}
-              autoSpinSignal={autoSpinSignal}
-              frozen={appState === 'TASK_CARD'}
-              frozenAngle={wheelAngle}
-              frozenWinnerIndex={selectedIndex}
-              reservedBottomHeight={appState === 'TASK_CARD' ? taskCardHeight : 0}
-              onSetActiveTask={handleSetActiveTask}
-              onMarkComplete={completeTaskById}
-              onDeleteTask={handleDeleteTask}
-            />
+            <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+              <WheelScreen
+                tasks={activeTasks}
+                onSpinStart={handleSpinStart}
+                onTaskSelected={handleTaskSelected}
+                autoSpinSignal={autoSpinSignal}
+                frozen={appState === 'TASK_CARD'}
+                frozenAngle={wheelAngle}
+                frozenWinnerIndex={selectedIndex}
+                onSetActiveTask={handleSetActiveTask}
+                onMarkComplete={completeTaskById}
+                onDeleteTask={handleDeleteTask}
+              />
+            </div>
             <EditModal
               isOpen={isEditModalOpen}
               tasks={tasks}
@@ -613,33 +610,25 @@ function App() {
               dumpPhoto={editSheetPhoto}
               onDumpPhotoChange={setEditSheetPhoto}
             />
-          </motion.div>
-        )}
-
-        {appState === 'TASK_CARD' && (
-          <motion.div
-            key={`task-card-${selectedTask?.id ?? 'none'}`}
-            variants={taskCardVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={taskCardTransition}
-            style={{ 
-              position: 'absolute', 
-              width: '100%', 
-              bottom: 0,
-              zIndex: 10,
-            }}
-          >
-            <div ref={taskCardRef}>
-              {selectedTask && (
-                <TaskCard
-                  task={selectedTask}
-                  onComplete={handleTaskComplete}
-                  onSkip={handleSkip}
-                />
+            <AnimatePresence>
+              {appState === 'TASK_CARD' && selectedTask && (
+                <motion.div
+                  key={`task-card-${selectedTask.id}`}
+                  variants={taskCardVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={taskCardTransition}
+                  style={{ flexShrink: 0, zIndex: 10 }}
+                >
+                  <TaskCard
+                    task={selectedTask}
+                    onComplete={handleTaskComplete}
+                    onSkip={handleSkip}
+                  />
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </motion.div>
         )}
 
