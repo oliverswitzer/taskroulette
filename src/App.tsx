@@ -561,21 +561,19 @@ function App() {
             animate="animate"
             exit="exit"
             transition={pageTransition}
-            // Fill the wrapper top-to-bottom (top:0/bottom:0) so this flex
-            // column has a DEFINITE height — without it, the box was
-            // content-sized + bottom-anchored, so the inner `flex:1` had no
-            // slack to grow into and all excess space piled up ABOVE the wheel
-            // (the "too much top margin" bug). paddingTop clears the AppLayout
-            // header (height 44 + 12+12 margins = 68px) which is a flow sibling
-            // above these absolutely-positioned pages; box-sizing:border-box so
-            // that padding eats into the 100% height instead of overflowing it.
+            // Start the box BELOW the AppLayout header (top:68) rather than at
+            // top:0 with paddingTop — a full-height box at top:0 overlays the
+            // header, and its (transparent) top band intercepts clicks on the
+            // home icon + edit-tasks button behind it. top:68 + bottom:0 still
+            // gives a DEFINITE height (viewport - header) so the inner flex:1
+            // has slack to distribute — without which excess space piled up
+            // ABOVE the wheel (the "too much top margin" bug). 68 = header
+            // height 44 + 12+12 margins.
             style={{
               position: 'absolute',
               width: '100%',
-              top: 0,
+              top: 68,
               bottom: 0,
-              paddingTop: 68,
-              boxSizing: 'border-box',
               display: 'flex',
               flexDirection: 'column',
             }}
