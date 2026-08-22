@@ -145,7 +145,12 @@ export function createApp() {
         return c.json({ error: 'refreshToken required' }, 400)
       }
       const result = await refreshGoogleAccessToken(body.refreshToken.trim())
-      if (!result.ok) return c.json({ error: result.error }, result.status as 401 | 500 | 502)
+      // Narrow via `'error' in result` (not `!result.ok`): Vercel's @vercel/node
+      // builder compiles this file with strict:false, under which truthiness
+      // narrowing on a discriminated union silently breaks (the else branch
+      // doesn't narrow). The `in` operator narrows correctly in BOTH strict and
+      // non-strict mode, so the deploy build and the strict typecheck gate agree.
+      if ('error' in result) return c.json({ error: result.error }, result.status as 401 | 500 | 502)
       return c.json({ accessToken: result.accessToken, expiresIn: result.expiresIn })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -285,7 +290,10 @@ Rules:
         lastName: body.lastName?.trim() || undefined,
       })
 
-      if (!result.ok) return c.json({ error: result.error }, result.status as 500 | 502)
+      // `'error' in result` narrows under both strict and strict:false — see the
+      // matching note in /api/google/refresh-token above (Vercel compiles this
+      // file non-strict, where `!result.ok` fails to narrow the union).
+      if ('error' in result) return c.json({ error: result.error }, result.status as 500 | 502)
 
       // Mark IP as having submitted email — persists across daily resets
       const ip = getClientIp(c)
